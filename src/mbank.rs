@@ -1,8 +1,8 @@
-use std::path::Path;
-use csv::{ReaderBuilder, WriterBuilder};
-use std::error::Error;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use chrono::NaiveDateTime;
+use csv::{ReaderBuilder, WriterBuilder};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::error::Error;
+use std::path::Path;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Transaction {
@@ -16,7 +16,11 @@ struct Transaction {
     stock_rate: f32,
     #[serde(rename(deserialize = "Waluta"))]
     currency: Currency,
-    #[serde(rename(deserialize = "Czas transakcji"), deserialize_with = "from_timestamp", serialize_with = "to_timestamp")]
+    #[serde(
+        rename(deserialize = "Czas transakcji"),
+        deserialize_with = "from_timestamp",
+        serialize_with = "to_timestamp"
+    )]
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Prowizja"), deserialize_with = "from_float")]
     commision: f32,
@@ -69,7 +73,7 @@ where
     let format = "%d.%m.%Y %H:%M:%S";
     match NaiveDateTime::parse_from_str(timestamp, format) {
         Ok(timestamp) => Ok(timestamp),
-        err => Err(de::Error::custom("")),
+        _ => Err(de::Error::custom("")),
     }
 }
 
@@ -81,16 +85,14 @@ where
     s.serialize_str(&date)
 }
 
-pub fn convert (path: &Path) -> Result<String, Box<dyn Error>> {
+pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
     let mut reader = ReaderBuilder::new()
         .delimiter(b';')
         .has_headers(true)
         .flexible(true)
         .from_path(path)?;
 
-    let mut writer = WriterBuilder::new()
-        .has_headers(true)
-        .from_writer(vec![]);
+    let mut writer = WriterBuilder::new().has_headers(true).from_writer(vec![]);
 
     for record in reader.deserialize() {
         let record: Transaction = record?;

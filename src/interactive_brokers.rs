@@ -37,7 +37,7 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
 
     for record in reader.deserialize() {
         let record: Transaction = record?;
-        println!("{:?}",record);
+        println!("{:?}", record);
     }
 
     Ok("".to_string())
