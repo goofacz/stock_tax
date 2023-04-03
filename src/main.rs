@@ -2,6 +2,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::Path;
 use std::vec::Vec;
 
+mod interactive_brokers;
 mod mbank;
 //mod transaction;
 //mod nbp;
@@ -37,13 +38,16 @@ fn main() {
     match &cli.command {
         Command::Convert(args) => {
             let path = Path::new(&args.path);
-            println!("{:?}",args.symbols);
+            println!("{:?}", args.symbols);
             match &args.source {
                 ConvertSource::Mbank => {
                     let result = mbank::convert(&path).unwrap();
                     println!("{}", result);
-                },
-                ConvertSource::InteractiveBrokers => {}
+                }
+                ConvertSource::InteractiveBrokers => {
+                    let result = interactive_brokers::convert(&path).unwrap();
+                    println!("{}", result);
+                }
             }
         }
     }
