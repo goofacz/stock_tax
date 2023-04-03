@@ -1,3 +1,5 @@
+use crate::transaction::Currency;
+use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
@@ -10,7 +12,37 @@ struct Transaction {
     #[serde(rename(deserialize = "Symbol"))]
     symbol: String,
     #[serde(rename(deserialize = "Quantity"))]
-    quantity: i32,
+    quantity: f32,
+    #[serde(rename(deserialize = "Currency"))]
+    currency: Currency,
+    #[serde(
+        rename(deserialize = "Date/Time"),
+        deserialize_with = "from_timestamp",
+        serialize_with = "to_timestamp"
+    )]
+    timestamp: NaiveDateTime,
+    #[serde(rename(deserialize = "Comm/Fee"))]
+    commision: f32,
+}
+
+fn from_timestamp<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let timestamp: &str = Deserialize::deserialize(deserializer)?;
+    let format = "%Y-%m-%d, %H:%M:%S";
+    match NaiveDateTime::parse_from_str(timestamp, format) {
+        Ok(timestamp) => Ok(timestamp),
+        _ => Err(de::Error::custom("")),
+    }
+}
+
+fn to_timestamp<S>(timestamp: &NaiveDateTime, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let date = timestamp.format("%d-%m-%Y").to_string();
+    s.serialize_str(&date)
 }
 
 pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
