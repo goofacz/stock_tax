@@ -1,3 +1,4 @@
+use crate::transaction::Currency;
 use chrono::NaiveDateTime;
 use csv::{ReaderBuilder, WriterBuilder};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -34,13 +35,6 @@ enum Operation {
     Buy,
     #[serde(rename(deserialize = "S"))]
     Sell,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-enum Currency {
-    PLN,
-    USD,
-    GBP,
 }
 
 fn from_symbol<'de, D>(deserializer: D) -> Result<String, D::Error>
