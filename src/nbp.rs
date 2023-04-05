@@ -1,19 +1,63 @@
-use std::error::Error;
-use chrono::NaiveDateTime;
+use crate::transaction::{Currency, CurrencyRates};
+use chrono::NaiveDate;
 use reqwest;
 use serde::{de, Deserialize, Deserializer};
-use crate::transaction::Currency;
+use std::collections::HashMap;
+use std::error::Error;
 
-#[derive(Deserialize)]
-pub struct CurrencyRate {
-    no: String,
-    mid: f32
+#[derive(Debug, Deserialize)]
+struct Rate {
+    #[serde(rename(deserialize = "mid"))]
+    value: f32,
+    #[serde(rename(deserialize = "effectiveDate"), deserialize_with = "from_date")]
+    date: NaiveDate,
 }
 
-pub fn lookup_currency_rate(currecny: Currency, timestamp: NaiveDateTime) -> Result<CurrencyRate, Box<dyn Error>> {
-    let currecny: String = currecny.to_string();
-    let date = timestamp.format("%Y-%m-%d").to_string();
-    let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currecny}/{date}/?format=json", currecny=currecny, date=date);
+#[derive(Debug, Deserialize)]
+struct Rates {
+    #[serde(rename(deserialize = "rates"))]
+    values: Vec<Rate>,
+}
+
+fn from_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: &str = Deserialize::deserialize(deserializer)?;
+    match NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+        Ok(date) => Ok(date),
+        _ => Err(de::Error::custom("")),
+    }
+}
+
+pub fn lookup_currency_rate(
+    currency: Currency,
+    year: i32,
+) -> Result<CurrencyRates, Box<dyn Error>> {
+    let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currency}/{begin_date}/{end_date}/?format=json",
+        currency=currency.to_string(),
+        begin_date=NaiveDate::from_ymd_opt(year, 1, 1)
+            .ok_or("")?,
+        end_date=NaiveDate::from_ymd_opt(year + 1, 1, 1)
+            .ok_or("")?
+            .pred_opt()
+            .ok_or("")?);
     let reply = reqwest::blocking::get(request)?;
-    Ok(reply.json()?)
+    let rates: Rates = reply.json()?;
+    Ok(CurrencyRates {
+        currency: currency,
+        rates: HashMap::from_iter(rates.values.iter().map(|rate| (rate.date, rate.value))),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_usd_2022() {
+        let rates = lookup_currency_rate(Currency::USD, 2022);
+        println!("{:?}", rates);
+        assert!(rates.is_ok());
+    }
 }

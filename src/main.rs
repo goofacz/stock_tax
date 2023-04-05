@@ -4,8 +4,8 @@ use std::vec::Vec;
 
 mod interactive_brokers;
 mod mbank;
+mod nbp;
 mod transaction;
-//mod nbp;
 
 #[derive(Parser)]
 struct Cli {
