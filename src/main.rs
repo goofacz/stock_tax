@@ -2,6 +2,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::Path;
 use std::vec::Vec;
 
+mod currency;
 mod interactive_brokers;
 mod mbank;
 mod nbp;
