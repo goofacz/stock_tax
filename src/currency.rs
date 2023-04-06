@@ -28,52 +28,18 @@ pub struct Rate<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl Currency for Usd {
-    fn get_value(&self) -> f64 {
-        self.0
-    }
-
-    fn get_name(&self) -> &str {
-        return "USD";
-    }
-}
-
-impl<T> Mul<T> for Usd
-where
-    f64: From<T>,
-{
-    type Output = Usd;
-    fn mul(self, rhs: T) -> Self {
-        Usd(self.0 * f64::from(rhs))
-    }
-}
-
-impl<T> Div<T> for Usd
-where
-    f64: From<T>,
-{
-    type Output = Usd;
-    fn div(self, rhs: T) -> Self {
-        Usd(self.0 / f64::from(rhs))
-    }
-}
-
-
-impl Currency for Pln {
-    fn get_value(&self) -> f64 {
-        self.0
-    }
-
-    fn get_name(&self) -> &str {
-        return "PLN";
-    }
-}
-
 impl<T> Rate<T>
 where
     T: Currency,
 {
-    pub fn convert(&self, amount: &T, date: &NaiveDate) -> Result<Pln, ()> {
+    pub fn new(rates: HashMap<NaiveDate, f64>) -> Rate<T> {
+        Rate {
+            rates: rates,
+            phantom_data: PhantomData,
+        }
+    }
+
+    pub fn convert(&self, amount: T, date: &NaiveDate) -> Result<Pln, ()> {
         let rate = self.rates.get(date).ok_or(())?;
         Ok(Pln(amount.get_value() * rate))
     }
@@ -102,5 +68,19 @@ mod tests {
         assert_eq!(b * 2.5, Usd(17.5));
         assert_eq!(b / 2, Usd(3.5));
         assert_eq!(b / 2.5, Usd(2.8));
+    }
+
+    #[test]
+    fn test_rate() {
+        let date1 = NaiveDate::from_ymd_opt(2022, 8, 1).unwrap();
+        let date2 = NaiveDate::from_ymd_opt(2022, 8, 2).unwrap();
+        let date3 = NaiveDate::from_ymd_opt(2022, 8, 3).unwrap();
+        let rates = HashMap::from([(date1, 4.3), (date2, 4.7)]);
+
+        let rates: Rate<Usd> = Rate::new(rates);
+        let a = Usd(20.);
+        assert_eq!(rates.convert(a, &date1), Ok(Pln(86.)));
+        assert_eq!(rates.convert(a, &date2), Ok(Pln(94.)));
+        assert_eq!(rates.convert(a, &date3), Err(()));
     }
 }
