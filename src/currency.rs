@@ -1,5 +1,6 @@
 use chrono::NaiveDate;
 use derive_more::{Add, Sub};
+use macros;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -17,10 +18,34 @@ impl fmt::Display for dyn Currency {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Add, Sub, PartialEq, Copy, Clone)]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Add,
+    Sub,
+    PartialEq,
+    Copy,
+    Clone,
+    macros::Currency,
+    macros::Mul,
+    macros::Div,
+)]
 pub struct Usd(f64);
 
-#[derive(Debug, Deserialize, Serialize, Add, Sub, PartialEq, Copy, Clone)]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Add,
+    Sub,
+    PartialEq,
+    Copy,
+    Clone,
+    macros::Currency,
+    macros::Mul,
+    macros::Div,
+)]
 pub struct Pln(f64);
 
 pub struct Rate<T> {
