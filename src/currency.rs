@@ -84,7 +84,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_math() {
+    fn test_currency() {
+        let a = Usd(3.45);
+        assert_eq!(a.get_value(), 3.45);
+        assert_eq!(a.get_name(), "USD");
+    }
+
+    #[test]
+    fn test_currency_math() {
         let a = Usd(3.45);
         let b = Usd(7.);
         assert_eq!(a + b, Usd(10.45));
