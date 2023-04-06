@@ -1,4 +1,4 @@
-use crate::transaction::{Currency, CurrencyRates};
+use crate::transaction::Currency;
 use chrono::NaiveDate;
 use reqwest;
 use serde::{de, Deserialize, Deserializer};
@@ -33,7 +33,7 @@ where
 pub fn lookup_currency_rate(
     currency: Currency,
     year: i32,
-) -> Result<CurrencyRates, Box<dyn Error>> {
+) -> Result<HashMap<NaiveDate, f32>, Box<dyn Error>> {
     let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currency}/{begin_date}/{end_date}/?format=json",
         currency=currency.to_string(),
         begin_date=NaiveDate::from_ymd_opt(year, 1, 1)
@@ -44,10 +44,9 @@ pub fn lookup_currency_rate(
             .ok_or("")?);
     let reply = reqwest::blocking::get(request)?;
     let rates: Rates = reply.json()?;
-    Ok(CurrencyRates {
-        currency: currency,
-        rates: HashMap::from_iter(rates.values.iter().map(|rate| (rate.date, rate.value))),
-    })
+    Ok(HashMap::from_iter(
+        rates.values.iter().map(|rate| (rate.date, rate.value)),
+    ))
 }
 
 #[cfg(test)]
@@ -57,7 +56,10 @@ mod tests {
     #[test]
     fn test_usd_2022() {
         let rates = lookup_currency_rate(Currency::USD, 2022);
-        println!("{:?}", rates);
         assert!(rates.is_ok());
+
+        let rates = rates.unwrap();
+        let date = NaiveDate::from_ymd_opt(2022, 8, 2).unwrap();
+        assert_eq!(rates[&date], 4.5984);
     }
 }
