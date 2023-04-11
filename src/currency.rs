@@ -27,11 +27,12 @@ impl fmt::Display for dyn Currency {
     PartialEq,
     Copy,
     Clone,
+    Default,
     macros::Currency,
     macros::Mul,
     macros::Div,
 )]
-pub struct Usd(f64);
+pub struct Usd(pub f64);
 
 #[derive(
     Debug,
@@ -42,12 +43,14 @@ pub struct Usd(f64);
     PartialEq,
     Copy,
     Clone,
+    Default,
     macros::Currency,
     macros::Mul,
     macros::Div,
 )]
-pub struct Pln(f64);
+pub struct Pln(pub f64);
 
+#[derive(Debug)]
 pub struct Rate<T> {
     rates: HashMap<NaiveDate, f64>,
     phantom_data: PhantomData<T>,
