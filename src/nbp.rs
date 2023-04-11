@@ -1,4 +1,5 @@
-use crate::transaction::Currency;
+use crate::currency;
+use chrono::Datelike;
 use chrono::NaiveDate;
 use reqwest;
 use serde::{de, Deserialize, Deserializer};
@@ -8,9 +9,11 @@ use std::error::Error;
 #[derive(Debug, Deserialize)]
 struct Rate {
     #[serde(rename(deserialize = "mid"))]
-    value: f32,
+    value: f64,
     #[serde(rename(deserialize = "effectiveDate"), deserialize_with = "from_date")]
     date: NaiveDate,
+    #[serde(rename(deserialize = "no"))]
+    id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,12 +33,12 @@ where
     }
 }
 
-pub fn lookup_currency_rate(
-    currency: Currency,
+pub fn lookup_yearly_rates(
+    currency: &String,
     year: i32,
-) -> Result<HashMap<NaiveDate, f32>, Box<dyn Error>> {
+) -> Result<HashMap<NaiveDate, f64>, Box<dyn Error>> {
     let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currency}/{begin_date}/{end_date}/?format=json",
-        currency=currency.to_string(),
+        currency=currency,
         begin_date=NaiveDate::from_ymd_opt(year, 1, 1)
             .ok_or("")?,
         end_date=NaiveDate::from_ymd_opt(year + 1, 1, 1)
@@ -49,17 +52,32 @@ pub fn lookup_currency_rate(
     ))
 }
 
+pub fn lookup_rates<T: currency::Currency + Default>(
+    begin_date: NaiveDate,
+    end_date: NaiveDate,
+) -> Result<currency::Rate<T>, Box<dyn Error>> {
+    let currency_name = T::default().get_name().to_string();
+    let mut rates = HashMap::new();
+    for year in begin_date.year()..=end_date.year() {
+        let yearly_rates = lookup_yearly_rates(&currency_name, year)?;
+        rates.extend(yearly_rates);
+    }
+    Ok(currency::Rate::new(rates.into()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_usd_2022() {
-        let rates = lookup_currency_rate(Currency::USD, 2022);
-        assert!(rates.is_ok());
-
-        let rates = rates.unwrap();
+    fn test_lookup_rates() {
+        let begin_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        let end_date = NaiveDate::from_ymd_opt(2022, 10, 1).unwrap();
+        let rates = lookup_rates::<currency::Usd>(begin_date, end_date).unwrap();
         let date = NaiveDate::from_ymd_opt(2022, 8, 2).unwrap();
-        assert_eq!(rates[&date], 4.5984);
+        assert_eq!(
+            rates.convert(currency::Usd(1.), &date).unwrap(),
+            currency::Pln(4.5984)
+        );
     }
 }
