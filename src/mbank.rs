@@ -1,9 +1,17 @@
-use crate::transaction::Currency;
 use chrono::NaiveDateTime;
 use csv::{ReaderBuilder, WriterBuilder};
+use derive_more::Display;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
 use std::path::Path;
+
+#[derive(Debug, Deserialize, Serialize, Display)]
+pub enum Currency {
+    PLN,
+    USD,
+    GBP,
+    EUR,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Transaction {
