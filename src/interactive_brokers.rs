@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use csv::ReaderBuilder;
 use derive_more::Display;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -31,6 +31,30 @@ struct Transaction {
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Comm/Fee"))]
     commision: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct Dividend {
+    #[serde(rename(deserialize = "Description"))]
+    symbol: String,
+    #[serde(rename(deserialize = "Amount"))]
+    ammount: f32,
+    #[serde(rename(deserialize = "Currency"))]
+    currency: Currency,
+    #[serde(rename(deserialize = "Date"), deserialize_with = "from_date")]
+    timestamp: NaiveDate,
+}
+
+fn from_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let timestamp: &str = Deserialize::deserialize(deserializer)?;
+    let format = "%Y-%m-%d";
+    match NaiveDate::parse_from_str(timestamp, format) {
+        Ok(timestamp) => Ok(timestamp),
+        _ => Err(de::Error::custom("")),
+    }
 }
 
 fn from_timestamp<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
@@ -77,6 +101,30 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
 
     for record in reader.deserialize() {
         let record: Transaction = record?;
+        println!("{:?}", record);
+    }
+
+    let dividends = lines
+        .iter()
+        .filter(|line| {
+            let header = "Dividends,Header,Currency,Date,Description,Amount";
+            let prefix = "Dividends,Data,";
+            let summary_prefix = "Dividends,Data,Total";
+            (line.starts_with(header) || line.starts_with(prefix))
+                && !line.starts_with(summary_prefix)
+        })
+        .collect::<Vec<_>>()
+        .iter()
+        .fold(String::new(), |buf, &line| buf + line + "\n");
+
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b',')
+        .has_headers(true)
+        .flexible(true)
+        .from_reader(dividends.as_bytes());
+
+    for record in reader.deserialize() {
+        let record: Dividend = record?;
         println!("{:?}", record);
     }
 
