@@ -40,16 +40,11 @@ fn main() {
         Command::Convert(args) => {
             let path = Path::new(&args.path);
             println!("{:?}", args.symbols);
-            match &args.source {
-                ConvertSource::Mbank => {
-                    let result = mbank::convert(&path).unwrap();
-                    println!("{}", result);
-                }
-                ConvertSource::InteractiveBrokers => {
-                    let result = interactive_brokers::convert(&path).unwrap();
-                    println!("{}", result);
-                }
-            }
+            let activities = match &args.source {
+                ConvertSource::Mbank => mbank::convert(&path).unwrap(),
+                ConvertSource::InteractiveBrokers => interactive_brokers::convert(&path).unwrap(),
+            };
+            println!("{:?}", activities);
         }
     }
 }

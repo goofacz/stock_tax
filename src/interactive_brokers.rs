@@ -152,10 +152,11 @@ impl Into<activity::Activity> for Dividend {
     }
 }
 
-pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
+pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
     let handle = File::open(path)?;
     let reader = BufReader::new(handle);
     let lines: Vec<_> = reader.lines().collect::<Result<Vec<_>, _>>()?;
+    let mut activities = vec![];
 
     let transactions = lines
         .iter()
@@ -168,7 +169,12 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
         .iter()
         .fold(String::new(),|buf, &line|{ buf + line + "\n"});
 
-    let transactions = extract::<Transaction>(transactions)?;
+    activities.append(
+        &mut extract::<Transaction>(transactions)?
+            .into_iter()
+            .map(|entry| entry.into())
+            .collect::<Vec<activity::Activity>>(),
+    );
 
     let dividends = lines
         .iter()
@@ -183,7 +189,12 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
         .iter()
         .fold(String::new(), |buf, &line| buf + line + "\n");
 
-    let dividends = extract::<Dividend>(dividends)?;
+    activities.append(
+        &mut extract::<Dividend>(dividends)?
+            .into_iter()
+            .map(|entry| entry.into())
+            .collect::<Vec<activity::Activity>>(),
+    );
 
-    Ok("".to_string())
+    Ok(activities)
 }

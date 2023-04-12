@@ -1,7 +1,7 @@
 use crate::activity;
 use crate::currency;
 use chrono::NaiveDateTime;
-use csv::{ReaderBuilder, WriterBuilder};
+use csv::ReaderBuilder;
 use derive_more::Display;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::Into;
@@ -120,18 +120,19 @@ impl Into<activity::Activity> for Transaction {
     }
 }
 
-pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
+pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
     let mut reader = ReaderBuilder::new()
         .delimiter(b';')
         .has_headers(true)
         .flexible(true)
         .from_path(path)?;
 
-    let mut writer = WriterBuilder::new().has_headers(true).from_writer(vec![]);
+    let transactions = reader
+        .deserialize::<Transaction>()
+        .collect::<Result<Vec<_>, _>>()?;
 
-    for record in reader.deserialize() {
-        let record: Transaction = record?;
-        writer.serialize(record)?;
-    }
-    Ok(String::from_utf8(writer.into_inner()?)?)
+    Ok(transactions
+        .into_iter()
+        .map(|entry| entry.into())
+        .collect::<Vec<activity::Activity>>())
 }
