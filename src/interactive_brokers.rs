@@ -1,7 +1,10 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use crate::activity;
+use crate::currency;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
 use derive_more::Display;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::convert::Into;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -20,7 +23,9 @@ struct Transaction {
     #[serde(rename(deserialize = "Symbol"))]
     symbol: String,
     #[serde(rename(deserialize = "Quantity"))]
-    quantity: f32,
+    quantity: f64,
+    #[serde(rename(deserialize = "T. Price"))]
+    price: f64,
     #[serde(rename(deserialize = "Currency"))]
     currency: Currency,
     #[serde(
@@ -30,7 +35,7 @@ struct Transaction {
     )]
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Comm/Fee"))]
-    commision: f32,
+    commision: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +43,7 @@ struct Dividend {
     #[serde(rename(deserialize = "Description"), deserialize_with = "from_symbol")]
     symbol: String,
     #[serde(rename(deserialize = "Amount"))]
-    ammount: f32,
+    value: f64,
     #[serde(rename(deserialize = "Currency"))]
     currency: Currency,
     #[serde(rename(deserialize = "Date"), deserialize_with = "from_date")]
@@ -99,6 +104,52 @@ where
         .from_reader(lines.as_bytes());
 
     Ok(reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?)
+}
+
+fn into_currency(currency: &Currency, value: f64) -> Box<dyn currency::Currency> {
+    match currency {
+        Currency::PLN => Box::new(currency::Pln(value)),
+        Currency::USD => Box::new(currency::Usd(value)),
+        Currency::GBP => Box::new(currency::Gbp(value)),
+        Currency::EUR => Box::new(currency::Eur(value)),
+    }
+}
+
+impl Into<activity::Activity> for Transaction {
+    fn into(self) -> activity::Activity {
+        activity::Activity {
+            symbol: self.symbol,
+            timestamp: self.timestamp,
+            operation: match self.quantity {
+                _ if self.quantity > 0. => activity::Operation::Buy {
+                    quantity: self.quantity,
+                    price: into_currency(&self.currency, self.price),
+                    commision: into_currency(&self.currency, self.commision),
+                },
+                _ if self.quantity < 0. => activity::Operation::Sell {
+                    quantity: self.quantity.abs(),
+                    price: into_currency(&self.currency, self.price),
+                    commision: into_currency(&self.currency, self.commision),
+                },
+                _ => todo!(),
+            },
+        }
+    }
+}
+
+impl Into<activity::Activity> for Dividend {
+    fn into(self) -> activity::Activity {
+        activity::Activity {
+            symbol: self.symbol,
+            timestamp: NaiveDateTime::new(
+                self.timestamp,
+                NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+            ),
+            operation: activity::Operation::Dividend {
+                value: into_currency(&self.currency, self.value),
+            },
+        }
+    }
 }
 
 pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
