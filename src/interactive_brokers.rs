@@ -35,7 +35,7 @@ struct Transaction {
 
 #[derive(Debug, Deserialize)]
 struct Dividend {
-    #[serde(rename(deserialize = "Description"))]
+    #[serde(rename(deserialize = "Description"), deserialize_with = "from_symbol")]
     symbol: String,
     #[serde(rename(deserialize = "Amount"))]
     ammount: f32,
@@ -43,6 +43,17 @@ struct Dividend {
     currency: Currency,
     #[serde(rename(deserialize = "Date"), deserialize_with = "from_date")]
     timestamp: NaiveDate,
+}
+
+fn from_symbol<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let symbol: &str = Deserialize::deserialize(deserializer)?;
+    match symbol.split("(").next() {
+        Some(symbol) => Ok(symbol.to_string()),
+        _ => Err(de::Error::custom("")),
+    }
 }
 
 fn from_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
@@ -77,6 +88,19 @@ where
     s.serialize_str(&date)
 }
 
+fn extract<'de, T>(lines: String) -> Result<Vec<T>, Box<dyn Error>>
+where
+    T: de::DeserializeOwned,
+{
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b',')
+        .has_headers(true)
+        .flexible(true)
+        .from_reader(lines.as_bytes());
+
+    Ok(reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?)
+}
+
 pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
     let handle = File::open(path)?;
     let reader = BufReader::new(handle);
@@ -93,16 +117,7 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
         .iter()
         .fold(String::new(),|buf, &line|{ buf + line + "\n"});
 
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b',')
-        .has_headers(true)
-        .flexible(true)
-        .from_reader(transactions.as_bytes());
-
-    for record in reader.deserialize() {
-        let record: Transaction = record?;
-        println!("{:?}", record);
-    }
+    let transactions = extract::<Transaction>(transactions)?;
 
     let dividends = lines
         .iter()
@@ -117,16 +132,7 @@ pub fn convert(path: &Path) -> Result<String, Box<dyn Error>> {
         .iter()
         .fold(String::new(), |buf, &line| buf + line + "\n");
 
-    let mut reader = ReaderBuilder::new()
-        .delimiter(b',')
-        .has_headers(true)
-        .flexible(true)
-        .from_reader(dividends.as_bytes());
-
-    for record in reader.deserialize() {
-        let record: Dividend = record?;
-        println!("{:?}", record);
-    }
+    let dividends = extract::<Dividend>(dividends)?;
 
     Ok("".to_string())
 }
