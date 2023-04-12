@@ -50,6 +50,38 @@ pub struct Usd(pub f64);
 )]
 pub struct Pln(pub f64);
 
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Add,
+    Sub,
+    PartialEq,
+    Copy,
+    Clone,
+    Default,
+    macros::Currency,
+    macros::Mul,
+    macros::Div,
+)]
+pub struct Eur(pub f64);
+
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Add,
+    Sub,
+    PartialEq,
+    Copy,
+    Clone,
+    Default,
+    macros::Currency,
+    macros::Mul,
+    macros::Div,
+)]
+pub struct Gbp(pub f64);
+
 #[derive(Debug)]
 pub struct Rate<T> {
     rates: HashMap<NaiveDate, f64>,
