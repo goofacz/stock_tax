@@ -12,9 +12,12 @@ pub enum Operation {
         price: Box<dyn Currency>,
         commision: Box<dyn Currency>,
     },
+    Dividend {
+        value: Box<dyn Currency>,
+    },
 }
 
-pub struct Transaction {
+pub struct Activity {
     pub symbol: String,
     pub timestamp: NaiveDateTime,
     pub operation: Operation,

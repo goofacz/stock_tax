@@ -2,12 +2,11 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::Path;
 use std::vec::Vec;
 
+mod activity;
 mod currency;
-mod dividend;
 mod interactive_brokers;
 mod mbank;
 mod nbp;
-mod transaction;
 
 #[derive(Parser)]
 struct Cli {
