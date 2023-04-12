@@ -1,6 +1,7 @@
 use crate::currency::Currency;
 use chrono::NaiveDateTime;
 
+#[derive(Debug)]
 pub enum Operation {
     Buy {
         quantity: f64,
@@ -17,6 +18,7 @@ pub enum Operation {
     },
 }
 
+#[derive(Debug)]
 pub struct Activity {
     pub symbol: String,
     pub timestamp: NaiveDateTime,

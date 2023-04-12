@@ -4,10 +4,11 @@ use macros;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Div, Mul};
 
-pub trait Currency {
+pub trait Currency: Debug {
     fn get_value(&self) -> f64;
     fn get_name(&self) -> &str;
 }
