@@ -1,6 +1,7 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use serde_json;
 use std::path::Path;
-use std::vec::Vec;
+
 
 mod activity;
 mod currency;
@@ -23,8 +24,6 @@ enum Command {
 struct ConvertArgs {
     source: ConvertSource,
     path: String,
-    #[arg(short, long)]
-    symbols: Option<Vec<String>>,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -39,12 +38,11 @@ fn main() {
     match &cli.command {
         Command::Convert(args) => {
             let path = Path::new(&args.path);
-            println!("{:?}", args.symbols);
             let activities = match &args.source {
                 ConvertSource::Mbank => mbank::convert(&path).unwrap(),
                 ConvertSource::InteractiveBrokers => interactive_brokers::convert(&path).unwrap(),
             };
-            println!("{:?}", activities);
+            println!("{}", serde_json::to_string(&activities).unwrap());
         }
     }
 }
