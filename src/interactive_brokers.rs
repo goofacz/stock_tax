@@ -124,13 +124,13 @@ impl Into<activity::Activity> for Transaction {
             operation: match self.quantity.is_sign_positive() {
                 true => activity::Operation::Buy {
                     quantity: self.quantity,
-                    price: into_currency(&self.currency, self.price),
-                    commision: into_currency(&self.currency, self.commision),
+                    price: into_currency(&self.currency, self.price.round_dp(2)),
+                    commision: into_currency(&self.currency, self.commision.abs().round_dp(2)),
                 },
                 false => activity::Operation::Sell {
                     quantity: self.quantity.abs(),
-                    price: into_currency(&self.currency, self.price),
-                    commision: into_currency(&self.currency, self.commision),
+                    price: into_currency(&self.currency, self.price.round_dp(2)),
+                    commision: into_currency(&self.currency, self.commision.abs().round_dp(2)),
                 },
             },
         }

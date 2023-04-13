@@ -56,7 +56,7 @@ where
     let symbol: &str = Deserialize::deserialize(deserializer)?;
     match symbol.split(" ").next() {
         Some(symbol) => Ok(symbol.to_string()),
-        _ => Err(de::Error::custom("")),
+        _ => Err(de::Error::custom(format!("Failed to parse \"{}\"", symbol))),
     }
 }
 
@@ -69,7 +69,7 @@ where
 
     match Decimal::from_str_exact(&price) {
         Ok(price) => Ok(price),
-        _ => Err(de::Error::custom("")),
+        _ => Err(de::Error::custom(format!("Failed to parse \"{}\"", price))),
     }
 }
 
@@ -81,7 +81,10 @@ where
     let format = "%d.%m.%Y %H:%M:%S";
     match NaiveDateTime::parse_from_str(timestamp, format) {
         Ok(timestamp) => Ok(timestamp),
-        _ => Err(de::Error::custom("")),
+        _ => Err(de::Error::custom(format!(
+            "Failed to parse \"{}\"",
+            timestamp
+        ))),
     }
 }
 
@@ -110,13 +113,13 @@ impl Into<activity::Activity> for Transaction {
             operation: match self.operation {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
-                    price: into_currency(&self.currency, self.price),
-                    commision: into_currency(&self.commision_currency, self.commision),
+                    price: into_currency(&self.currency, self.price.round_dp(2)),
+                    commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
-                    price: into_currency(&self.currency, self.price),
-                    commision: into_currency(&self.commision_currency, self.commision),
+                    price: into_currency(&self.currency, self.price.round_dp(2)),
+                    commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
                 },
             },
         }

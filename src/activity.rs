@@ -1,5 +1,5 @@
 use crate::currency::{Currency, Eur, Gbp, Pln, Usd};
-use chrono::naive::serde::ts_nanoseconds;
+use chrono::naive::serde::ts_milliseconds;
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -33,11 +33,11 @@ where
     let value: &str = Deserialize::deserialize(deserializer)?;
     let (amount, currency) = match value.split_once(' ') {
         Some((amount, currency)) => (amount, currency),
-        _ => return Err(de::Error::custom("")),
+        _ => return Err(de::Error::custom(format!("Failed to split \"{}\"", value))),
     };
     let amount = match Decimal::from_str_exact(amount) {
         Ok(amount) => amount,
-        _ => return Err(de::Error::custom("")),
+        _ => return Err(de::Error::custom(format!("Failed to parse \"{}\"", amount))),
     };
 
     match currency {
@@ -45,7 +45,10 @@ where
         "USD" => Ok(Box::new(Usd(amount))),
         "GBP" => Ok(Box::new(Gbp(amount))),
         "EUR" => Ok(Box::new(Eur(amount))),
-        _ => Err(de::Error::custom("")),
+        _ => Err(de::Error::custom(format!(
+            "Unknown currency \"{}\"",
+            currency
+        ))),
     }
 }
 
@@ -59,7 +62,7 @@ where
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Activity {
     pub symbol: String,
-    #[serde(with = "ts_nanoseconds")]
+    #[serde(with = "ts_milliseconds")]
     pub timestamp: NaiveDateTime,
     pub operation: Operation,
 }
