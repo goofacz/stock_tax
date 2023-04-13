@@ -8,8 +8,8 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
     let name = format!("{}", ident).to_uppercase();
     let output = quote! {
         impl Currency for #ident {
-            fn get_value(&self) -> f64 {
-                self.0
+            fn get_value(&self) -> &Decimal {
+                &self.0
             }
 
             fn get_name(&self) -> &str {
@@ -24,13 +24,11 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
 pub fn derive_mul(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, .. } = parse_macro_input!(input);
     let output = quote! {
-        impl<T> Mul<T> for #ident
-        where
-            f64: From<T>,
-        {
+        impl Mul<Decimal> for #ident {
             type Output = #ident;
-            fn mul(self, rhs: T) -> Self {
-                #ident(self.0 * f64::from(rhs))
+            fn mul(self, rhs: Decimal) -> Self {
+                let result = self.0.checked_mul(rhs).unwrap().round_dp(2);
+                #ident(result)
             }
         }
     };
@@ -41,13 +39,11 @@ pub fn derive_mul(input: TokenStream) -> TokenStream {
 pub fn derive_div(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, .. } = parse_macro_input!(input);
     let output = quote! {
-        impl<T> Div<T> for #ident
-        where
-            f64: From<T>,
-        {
+        impl Div<Decimal> for #ident {
             type Output = #ident;
-            fn div(self, rhs: T) -> Self {
-                #ident(self.0 / f64::from(rhs))
+            fn div(self, rhs: Decimal) -> Self {
+                let result = self.0.checked_div(rhs).unwrap().round_dp(2);
+                #ident(result)
             }
         }
     };

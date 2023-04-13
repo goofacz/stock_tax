@@ -3,6 +3,7 @@ use crate::currency;
 use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use derive_more::Display;
+use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::Into;
 use std::error::Error;
@@ -23,9 +24,9 @@ struct Transaction {
     #[serde(rename(deserialize = "K/S"))]
     operation: Operation,
     #[serde(rename(deserialize = "Liczba"))]
-    quantity: u32,
+    quantity: Decimal,
     #[serde(rename(deserialize = "Kurs"), deserialize_with = "from_float")]
-    price: f64,
+    price: Decimal,
     #[serde(rename(deserialize = "Waluta"))]
     currency: Currency,
     #[serde(
@@ -35,7 +36,7 @@ struct Transaction {
     )]
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Prowizja"), deserialize_with = "from_float")]
-    commision: f64,
+    commision: Decimal,
     #[serde(rename(deserialize = "Waluta rozliczenia"))]
     commision_currency: Currency,
 }
@@ -59,12 +60,14 @@ where
     }
 }
 
-fn from_float<'de, D>(deserializer: D) -> Result<f64, D::Error>
+fn from_float<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
 where
     D: Deserializer<'de>,
 {
     let price: &str = Deserialize::deserialize(deserializer)?;
-    match price.trim().replace(",", ".").parse() {
+    let price = price.trim().replace(",", ".");
+
+    match Decimal::from_str_exact(&price) {
         Ok(price) => Ok(price),
         _ => Err(de::Error::custom("")),
     }
@@ -90,7 +93,7 @@ where
     s.serialize_str(&date)
 }
 
-fn into_currency(currency: &Currency, value: f64) -> Box<dyn currency::Currency> {
+fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Currency> {
     match currency {
         Currency::PLN => Box::new(currency::Pln(value)),
         Currency::USD => Box::new(currency::Usd(value)),

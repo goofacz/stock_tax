@@ -3,6 +3,7 @@ use crate::currency;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
 use derive_more::Display;
+use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::Into;
 use std::error::Error;
@@ -23,9 +24,9 @@ struct Transaction {
     #[serde(rename(deserialize = "Symbol"))]
     symbol: String,
     #[serde(rename(deserialize = "Quantity"))]
-    quantity: f64,
+    quantity: Decimal,
     #[serde(rename(deserialize = "T. Price"))]
-    price: f64,
+    price: Decimal,
     #[serde(rename(deserialize = "Currency"))]
     currency: Currency,
     #[serde(
@@ -35,7 +36,7 @@ struct Transaction {
     )]
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Comm/Fee"))]
-    commision: f64,
+    commision: Decimal,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,7 +44,7 @@ struct Dividend {
     #[serde(rename(deserialize = "Description"), deserialize_with = "from_symbol")]
     symbol: String,
     #[serde(rename(deserialize = "Amount"))]
-    value: f64,
+    value: Decimal,
     #[serde(rename(deserialize = "Currency"))]
     currency: Currency,
     #[serde(rename(deserialize = "Date"), deserialize_with = "from_date")]
@@ -106,7 +107,7 @@ where
     Ok(reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?)
 }
 
-fn into_currency(currency: &Currency, value: f64) -> Box<dyn currency::Currency> {
+fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Currency> {
     match currency {
         Currency::PLN => Box::new(currency::Pln(value)),
         Currency::USD => Box::new(currency::Usd(value)),
@@ -120,18 +121,17 @@ impl Into<activity::Activity> for Transaction {
         activity::Activity {
             symbol: self.symbol,
             timestamp: self.timestamp,
-            operation: match self.quantity {
-                _ if self.quantity > 0. => activity::Operation::Buy {
+            operation: match self.quantity.is_sign_positive() {
+                true => activity::Operation::Buy {
                     quantity: self.quantity,
                     price: into_currency(&self.currency, self.price),
                     commision: into_currency(&self.currency, self.commision),
                 },
-                _ if self.quantity < 0. => activity::Operation::Sell {
+                false => activity::Operation::Sell {
                     quantity: self.quantity.abs(),
                     price: into_currency(&self.currency, self.price),
                     commision: into_currency(&self.currency, self.commision),
                 },
-                _ => todo!(),
             },
         }
     }

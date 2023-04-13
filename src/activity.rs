@@ -1,15 +1,16 @@
 use crate::currency::Currency;
 use chrono::NaiveDateTime;
+use rust_decimal::Decimal;
 
 #[derive(Debug)]
 pub enum Operation {
     Buy {
-        quantity: f64,
+        quantity: Decimal,
         price: Box<dyn Currency>,
         commision: Box<dyn Currency>,
     },
     Sell {
-        quantity: f64,
+        quantity: Decimal,
         price: Box<dyn Currency>,
         commision: Box<dyn Currency>,
     },

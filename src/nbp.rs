@@ -2,6 +2,7 @@ use crate::currency;
 use chrono::Datelike;
 use chrono::NaiveDate;
 use reqwest;
+use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::error::Error;
@@ -9,7 +10,7 @@ use std::error::Error;
 #[derive(Debug, Deserialize)]
 struct Rate {
     #[serde(rename(deserialize = "mid"))]
-    value: f64,
+    value: Decimal,
     #[serde(rename(deserialize = "effectiveDate"), deserialize_with = "from_date")]
     date: NaiveDate,
     #[serde(rename(deserialize = "no"))]
@@ -36,7 +37,7 @@ where
 pub fn lookup_yearly_rates(
     currency: &String,
     year: i32,
-) -> Result<HashMap<NaiveDate, f64>, Box<dyn Error>> {
+) -> Result<HashMap<NaiveDate, Decimal>, Box<dyn Error>> {
     let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currency}/{begin_date}/{end_date}/?format=json",
         currency=currency,
         begin_date=NaiveDate::from_ymd_opt(year, 1, 1)
@@ -68,6 +69,7 @@ pub fn lookup_rates<T: currency::Currency + Default>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_lookup_rates() {
@@ -76,8 +78,8 @@ mod tests {
         let rates = lookup_rates::<currency::Usd>(begin_date, end_date).unwrap();
         let date = NaiveDate::from_ymd_opt(2022, 8, 2).unwrap();
         assert_eq!(
-            rates.convert(currency::Usd(1.), &date).unwrap(),
-            currency::Pln(4.5984)
+            rates.convert(&currency::Usd(dec!(1.)), &date).unwrap(),
+            currency::Pln(dec!(4.6))
         );
     }
 }
