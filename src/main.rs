@@ -27,6 +27,6 @@ fn main() {
 
     match result {
         Err(error) => eprintln!("{}", error),
-        _ => { /* nop */},
+        _ => { /* nop */ }
     }
 }
