@@ -5,39 +5,24 @@ use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Rate {
-    value: Decimal,
-    date: NaiveDateTime,
-    id: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub enum Operation {
     Buy {
         quantity: Decimal,
         #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
         price: Box<dyn Currency>,
-        price_pln: Pln,
         #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
         commision: Box<dyn Currency>,
-        commision_pln: Pln,
-        rate: Option<Rate>,
     },
     Sell {
         quantity: Decimal,
         #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
         price: Box<dyn Currency>,
-        price_pln: Pln,
         #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
         commision: Box<dyn Currency>,
-        commision_pln: Pln,
-        rate: Option<Rate>,
     },
     Dividend {
         #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
         value: Box<dyn Currency>,
-        value_pln: Pln,
-        rate: Option<Rate>,
     },
 }
 

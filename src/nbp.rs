@@ -97,7 +97,7 @@ pub fn convert(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::currency::{Eur, Usd};
+    use crate::currency::{Usd, Eur};
     use rust_decimal_macros::dec;
 
     #[test]

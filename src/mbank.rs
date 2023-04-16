@@ -4,7 +4,6 @@ use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use derive_more::Display;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::Into;
 use std::error::Error;
@@ -115,18 +114,12 @@ impl Into<activity::Activity> for Transaction {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
                     price: into_currency(&self.currency, self.price.round_dp(2)),
-                    price_pln: currency::Pln(dec!(0)),
                     commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
-                    commision_pln: currency::Pln(dec!(0)),
-                    rate: None,
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
                     price: into_currency(&self.currency, self.price.round_dp(2)),
-                    price_pln: currency::Pln(dec!(0)),
                     commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
-                    commision_pln: currency::Pln(dec!(0)),
-                    rate: None,
                 },
             },
         }
