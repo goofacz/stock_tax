@@ -1,18 +1,18 @@
-use crate::currency;
-use chrono::Datelike;
-use chrono::NaiveDate;
-use reqwest;
+use crate::currency::{Currency, Pln};
+use chrono::naive::{Days, NaiveDateTime};
+use chrono::{NaiveDate, NaiveTime};
+use derive_more::{Display, Error};
+use reqwest::{blocking::Client, StatusCode};
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer};
-use std::collections::HashMap;
-use std::error::Error;
+use std::error;
 
-#[derive(Debug, Deserialize)]
-struct Rate {
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+pub struct Rate {
     #[serde(rename(deserialize = "mid"))]
     value: Decimal,
     #[serde(rename(deserialize = "effectiveDate"), deserialize_with = "from_date")]
-    date: NaiveDate,
+    date: NaiveDateTime,
     #[serde(rename(deserialize = "no"))]
     id: String,
 }
@@ -23,63 +23,136 @@ struct Rates {
     values: Vec<Rate>,
 }
 
-fn from_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+#[derive(Display, Error, Debug)]
+pub struct Error {
+    reason: String,
+}
+
+fn from_date<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
 where
     D: Deserializer<'de>,
 {
     let value: &str = Deserialize::deserialize(deserializer)?;
-    match NaiveDate::parse_from_str(value, "%Y-%m-%d") {
-        Ok(date) => Ok(date),
-        _ => Err(de::Error::custom("")),
-    }
+    let date = match NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+        Ok(date) => date,
+        _ => {
+            return Err(de::Error::custom(format!(
+                "Failed to parse date: {}",
+                value
+            )))
+        }
+    };
+    let time = match NaiveTime::from_hms_opt(0, 0, 0) {
+        Some(time) => time,
+        _ => return Err(de::Error::custom(format!("Failed to create empty time"))),
+    };
+    Ok(NaiveDateTime::new(date, time))
 }
 
-pub fn lookup_yearly_rates(
-    currency: &String,
-    year: i32,
-) -> Result<HashMap<NaiveDate, Decimal>, Box<dyn Error>> {
-    let request = format!("http://api.nbp.pl/api/exchangerates/rates/a/{currency}/{begin_date}/{end_date}/?format=json",
-        currency=currency,
-        begin_date=NaiveDate::from_ymd_opt(year, 1, 1)
-            .ok_or("")?,
-        end_date=NaiveDate::from_ymd_opt(year + 1, 1, 1)
-            .ok_or("")?
-            .pred_opt()
-            .ok_or("")?);
-    let reply = reqwest::blocking::get(request)?;
-    let rates: Rates = reply.json()?;
-    Ok(HashMap::from_iter(
-        rates.values.iter().map(|rate| (rate.date, rate.value)),
-    ))
-}
-
-pub fn lookup_rates<T: currency::Currency + Default>(
-    begin_date: NaiveDate,
-    end_date: NaiveDate,
-) -> Result<currency::Rate<T>, Box<dyn Error>> {
-    let currency_name = T::default().get_name().to_string();
-    let mut rates = HashMap::new();
-    for year in begin_date.year()..=end_date.year() {
-        let yearly_rates = lookup_yearly_rates(&currency_name, year)?;
-        rates.extend(yearly_rates);
+pub fn convert(
+    client: &Client,
+    amount: &dyn Currency,
+    trade_date: &NaiveDateTime,
+) -> Result<(Pln, Option<Rate>), Box<dyn error::Error>> {
+    let currency_name = amount.get_name();
+    if currency_name == Pln::default().get_name() {
+        return Ok((Pln(*amount.get_value()), None));
     }
-    Ok(currency::Rate::new(rates.into()))
+
+    for days in 1..=10 {
+        let date = match trade_date.checked_sub_days(Days::new(days)) {
+            Some(date) => date,
+            _ => break,
+        };
+
+        let request = format!(
+            "http://api.nbp.pl/api/exchangerates/rates/a/{currency_name}/{date}/?format=json",
+            currency_name = currency_name,
+            date = date.format("%Y-%m-%d").to_string()
+        );
+
+        let reply = client.get(request).send()?;
+        if reply.status() != StatusCode::OK {
+            continue;
+        }
+
+        let rates: Rates = reply.json()?;
+        let rate = match rates.values.first() {
+            Some(rate) => rate,
+            _ => {
+                return Err(Box::new(Error {
+                    reason: "No rate".to_string(),
+                }))
+            }
+        };
+        let value = (amount.get_value() * rate.value).round_dp(2);
+        return Ok((Pln(value), Some(rate.clone())));
+    }
+
+    Err(Box::new(Error {
+        reason: "Failed to find rate for trade date".to_string(),
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::currency::{Usd, Eur};
     use rust_decimal_macros::dec;
 
     #[test]
-    fn test_lookup_rates() {
-        let begin_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
-        let end_date = NaiveDate::from_ymd_opt(2022, 10, 1).unwrap();
-        let rates = lookup_rates::<currency::Usd>(begin_date, end_date).unwrap();
-        let date = NaiveDate::from_ymd_opt(2022, 8, 2).unwrap();
+    fn test_usd_day_off() {
+        let client = Client::new();
+        let date = NaiveDate::from_ymd_opt(2020, 1, 2).unwrap();
+        let time = NaiveTime::from_hms_milli_opt(0, 0, 0, 0).unwrap();
+        let trade_timestamp = NaiveDateTime::new(date, time);
+        let rate_date = NaiveDate::from_ymd_opt(2019, 12, 31).unwrap();
+        let rate_time = NaiveTime::from_hms_milli_opt(0, 0, 0, 0).unwrap();
+        let rate_timestamp = NaiveDateTime::new(rate_date, rate_time);
+        let amount = Usd(dec!(20));
+        let (pln, rate) = convert(&client, &amount, &trade_timestamp).unwrap();
+        assert_eq!(pln, Pln(dec!(75.95)));
         assert_eq!(
-            rates.convert(&currency::Usd(dec!(1.)), &date).unwrap(),
-            currency::Pln(dec!(4.6))
+            rate,
+            Some(Rate {
+                value: dec!(3.7977),
+                date: rate_timestamp,
+                id: "251/A/NBP/2019".to_string()
+            })
         );
+    }
+
+    #[test]
+    fn test_eur_business_day() {
+        let client = Client::new();
+        let date = NaiveDate::from_ymd_opt(2021, 1, 6).unwrap();
+        let time = NaiveTime::from_hms_milli_opt(0, 0, 0, 0).unwrap();
+        let trade_timestamp = NaiveDateTime::new(date, time);
+        let rate_date = NaiveDate::from_ymd_opt(2021, 1, 5).unwrap();
+        let rate_time = NaiveTime::from_hms_milli_opt(0, 0, 0, 0).unwrap();
+        let rate_timestamp = NaiveDateTime::new(rate_date, rate_time);
+        let amount = Eur(dec!(20));
+        let (pln, rate) = convert(&client, &amount, &trade_timestamp).unwrap();
+        assert_eq!(pln, Pln(dec!(90.89)));
+        assert_eq!(
+            rate,
+            Some(Rate {
+                value: dec!(4.5446),
+                date: rate_timestamp,
+                id: "002/A/NBP/2021".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn test_pln() {
+        let client = Client::new();
+        let date = NaiveDate::from_ymd_opt(2020, 1, 2).unwrap();
+        let time = NaiveTime::from_hms_milli_opt(0, 0, 0, 0).unwrap();
+        let trade_timestamp = NaiveDateTime::new(date, time);
+        let amount = Pln(dec!(20));
+        let (pln, rate) = convert(&client, &amount, &trade_timestamp).unwrap();
+        assert_eq!(pln, Pln(dec!(20)));
+        assert_eq!(rate, None);
     }
 }
