@@ -1,5 +1,6 @@
 use crate::activity;
 use crate::currency;
+use crate::nbp;
 use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use derive_more::Display;
@@ -105,24 +106,50 @@ fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Curre
     }
 }
 
-impl Into<activity::Activity> for Transaction {
-    fn into(self) -> activity::Activity {
-        activity::Activity {
+fn into_money(
+    value: Box<dyn currency::Currency>,
+    timestamp: &NaiveDateTime,
+) -> Result<activity::Money, Box<dyn Error>> {
+    let (pln, rate) = nbp::convert(&value, timestamp)?;
+    Ok(activity::Money {
+        original: value,
+        pln: pln,
+        rate: rate,
+    })
+}
+
+impl TryInto<activity::Activity> for Transaction {
+    type Error = Box<dyn Error>;
+
+    fn try_into(self) -> Result<activity::Activity, Self::Error> {
+        Ok(activity::Activity {
             symbol: self.symbol,
             timestamp: self.timestamp,
             operation: match self.operation {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
-                    price: into_currency(&self.currency, self.price.round_dp(2)),
-                    commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                    price: into_money(
+                        into_currency(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: into_money(
+                        into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                        &self.timestamp,
+                    )?,
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
-                    price: into_currency(&self.currency, self.price.round_dp(2)),
-                    commision: into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                    price: into_money(
+                        into_currency(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: into_money(
+                        into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                        &self.timestamp,
+                    )?,
                 },
             },
-        }
+        })
     }
 }
 
@@ -139,6 +166,8 @@ pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
 
     Ok(transactions
         .into_iter()
-        .map(|entry| entry.into())
+        .map(|entry| entry.try_into())
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
         .collect::<Vec<activity::Activity>>())
 }

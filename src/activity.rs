@@ -1,28 +1,32 @@
 use crate::currency::{Currency, Eur, Gbp, Pln, Usd};
+use crate::nbp;
 use chrono::naive::serde::ts_milliseconds;
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct Money {
+    #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
+    pub original: Box<dyn Currency>,
+    pub pln: Pln,
+    pub rate: Option<nbp::Rate>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub enum Operation {
     Buy {
         quantity: Decimal,
-        #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
-        price: Box<dyn Currency>,
-        #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
-        commision: Box<dyn Currency>,
+        price: Money,
+        commision: Money,
     },
     Sell {
         quantity: Decimal,
-        #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
-        price: Box<dyn Currency>,
-        #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
-        commision: Box<dyn Currency>,
+        price: Money,
+        commision: Money,
     },
     Dividend {
-        #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
-        value: Box<dyn Currency>,
+        value: Money,
     },
 }
 

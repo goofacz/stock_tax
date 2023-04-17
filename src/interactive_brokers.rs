@@ -1,11 +1,11 @@
 use crate::activity;
 use crate::currency;
+use crate::nbp;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
 use derive_more::Display;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::convert::Into;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -116,39 +116,66 @@ fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Curre
     }
 }
 
-impl Into<activity::Activity> for Transaction {
-    fn into(self) -> activity::Activity {
-        activity::Activity {
+fn into_money(
+    value: Box<dyn currency::Currency>,
+    timestamp: &NaiveDateTime,
+) -> Result<activity::Money, Box<dyn Error>> {
+    let (pln, rate) = nbp::convert(&value, timestamp)?;
+    Ok(activity::Money {
+        original: value,
+        pln: pln,
+        rate: rate,
+    })
+}
+
+impl TryInto<activity::Activity> for Transaction {
+    type Error = Box<dyn Error>;
+
+    fn try_into(self) -> Result<activity::Activity, Self::Error> {
+        Ok(activity::Activity {
             symbol: self.symbol,
             timestamp: self.timestamp,
             operation: match self.quantity.is_sign_positive() {
                 true => activity::Operation::Buy {
                     quantity: self.quantity,
-                    price: into_currency(&self.currency, self.price.round_dp(2)),
-                    commision: into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                    price: into_money(
+                        into_currency(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: into_money(
+                        into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                        &self.timestamp,
+                    )?,
                 },
                 false => activity::Operation::Sell {
                     quantity: self.quantity.abs(),
-                    price: into_currency(&self.currency, self.price.round_dp(2)),
-                    commision: into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                    price: into_money(
+                        into_currency(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: into_money(
+                        into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                        &self.timestamp,
+                    )?,
                 },
             },
-        }
+        })
     }
 }
 
-impl Into<activity::Activity> for Dividend {
-    fn into(self) -> activity::Activity {
-        activity::Activity {
+impl TryInto<activity::Activity> for Dividend {
+    type Error = Box<dyn Error>;
+
+    fn try_into(self) -> Result<activity::Activity, Self::Error> {
+        let timestamp =
+            NaiveDateTime::new(self.timestamp, NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        Ok(activity::Activity {
             symbol: self.symbol,
-            timestamp: NaiveDateTime::new(
-                self.timestamp,
-                NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
-            ),
+            timestamp: timestamp,
             operation: activity::Operation::Dividend {
-                value: into_currency(&self.currency, self.value),
+                value: into_money(into_currency(&self.currency, self.value), &timestamp)?,
             },
-        }
+        })
     }
 }
 
@@ -172,7 +199,9 @@ pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
     activities.append(
         &mut extract::<Transaction>(transactions)?
             .into_iter()
-            .map(|entry| entry.into())
+            .map(|entry| entry.try_into())
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .collect::<Vec<activity::Activity>>(),
     );
 
@@ -192,7 +221,9 @@ pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
     activities.append(
         &mut extract::<Dividend>(dividends)?
             .into_iter()
-            .map(|entry| entry.into())
+            .map(|entry| entry.try_into())
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .collect::<Vec<activity::Activity>>(),
     );
 
