@@ -31,14 +31,11 @@ where
     D: Deserializer<'de>,
 {
     let value: &str = Deserialize::deserialize(deserializer)?;
-    let (amount, currency) = match value.split_once(' ') {
-        Some((amount, currency)) => (amount, currency),
-        _ => return Err(de::Error::custom(format!("Failed to split \"{}\"", value))),
-    };
-    let amount = match Decimal::from_str_exact(amount) {
-        Ok(amount) => amount,
-        _ => return Err(de::Error::custom(format!("Failed to parse \"{}\"", amount))),
-    };
+    let (amount, currency) = value
+        .split_once(' ')
+        .ok_or(de::Error::custom(format!("Failed to split \"{}\"", value)))?;
+    let amount = Decimal::from_str_exact(amount)
+        .map_err(|_| de::Error::custom(format!("Failed to parse \"{}\"", amount)))?;
 
     match currency {
         "PLN" => Ok(Box::new(Pln(amount))),
