@@ -1,3 +1,4 @@
+use crate::activity::Activity;
 use crate::interactive_brokers;
 use crate::mbank;
 
@@ -25,6 +26,22 @@ enum ConvertSource {
     InteractiveBrokers,
 }
 
+impl Error {
+    fn new(reason: &str) -> Error {
+        Error {
+            reason: reason.to_string(),
+        }
+    }
+}
+
+fn format_date(date: Option<&Activity>) -> Result<String, Box<dyn error::Error>> {
+    Ok(date
+        .ok_or(Error::new("No activities"))?
+        .timestamp
+        .format("%Y-%m-%d")
+        .to_string())
+}
+
 pub fn command(args: &CommandArgs) -> Result<(), Box<dyn error::Error>> {
     let path = Path::new(&args.path);
     let mut activities = match &args.source {
@@ -34,41 +51,14 @@ pub fn command(args: &CommandArgs) -> Result<(), Box<dyn error::Error>> {
 
     activities.sort_by_key(|activity| activity.timestamp);
 
-    let begin_date = match activities.first() {
-        Some(date) => date,
-        _ => {
-            return Err(Box::new(Error {
-                reason: "No activities".to_string(),
-            }))
-        }
-    };
-    let end_date = match activities.last() {
-        Some(date) => date,
-        _ => {
-            return Err(Box::new(Error {
-                reason: "No activities".to_string(),
-            }))
-        }
-    };
-    let file_name = format!(
-        "{}_{}_{}.json",
-        begin_date.timestamp.format("%Y-%m-%d").to_string(),
-        end_date.timestamp.format("%Y-%m-%d").to_string(),
-        &args.source
-    );
-
-    let handle = match OpenOptions::new()
+    let begin_date = format_date(activities.first())?;
+    let end_date = format_date(activities.last())?;
+    let file_name = format!("{}_{}_{}.json", begin_date, end_date, &args.source);
+    let handle = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(file_name)
-    {
-        Ok(handle) => handle,
-        Err(error) => return Err(Box::new(error)),
-    };
+        .open(file_name)?;
 
-    return match serde_json::to_writer_pretty(handle, &activities) {
-        Ok(_) => Ok(()),
-        Err(error) => Err(Box::new(error)),
-    };
+    serde_json::to_writer_pretty(handle, &activities).map(|_| Ok(()))?
 }
