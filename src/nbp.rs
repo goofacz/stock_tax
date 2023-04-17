@@ -5,23 +5,30 @@ use derive_more::{Display, Error};
 use lazy_static::lazy_static;
 use reqwest::{blocking::Client, StatusCode};
 use rust_decimal::Decimal;
-use serde::{de, Deserialize, Deserializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::error;
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Rate {
+    value: Decimal,
+    timestamp: NaiveDateTime,
+    id: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct Entry {
     #[serde(rename(deserialize = "mid"))]
     value: Decimal,
     #[serde(rename(deserialize = "effectiveDate"), deserialize_with = "from_date")]
-    date: NaiveDateTime,
+    timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "no"))]
     id: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct Rates {
+struct Entries {
     #[serde(rename(deserialize = "rates"))]
-    values: Vec<Rate>,
+    values: Vec<Entry>,
 }
 
 #[derive(Display, Error, Debug)]
@@ -47,6 +54,16 @@ where
     let time = NaiveTime::from_hms_opt(0, 0, 0)
         .ok_or(de::Error::custom(format!("Failed to create empty time")))?;
     Ok(NaiveDateTime::new(date, time))
+}
+
+impl Into<Rate> for Entry {
+    fn into(self) -> Rate {
+        Rate {
+            value: self.value,
+            timestamp: self.timestamp,
+            id: self.id,
+        }
+    }
 }
 
 pub fn convert(
@@ -79,10 +96,10 @@ pub fn convert(
                 continue;
             }
             StatusCode::OK => {
-                let rates: Rates = reply.json()?;
-                let rate = rates.values.first().ok_or(Error::new("No rate"))?;
-                let value = (amount.get_value() * rate.value).round_dp(2);
-                return Ok((Pln(value), Some(rate.clone())));
+                let mut entries: Entries = reply.json()?;
+                let entry = entries.values.pop().ok_or(Error::new("No entries"))?;
+                let value = (amount.get_value() * entry.value).round_dp(2);
+                return Ok((Pln(value), Some(entry.into())));
             }
             _ => {
                 return Err(Box::new(Error::new("GET request failed")));
@@ -114,7 +131,7 @@ mod tests {
             rate,
             Some(Rate {
                 value: dec!(3.7977),
-                date: rate_timestamp,
+                timestamp: rate_timestamp,
                 id: "251/A/NBP/2019".to_string()
             })
         );
@@ -135,7 +152,7 @@ mod tests {
             rate,
             Some(Rate {
                 value: dec!(4.5446),
-                date: rate_timestamp,
+                timestamp: rate_timestamp,
                 id: "002/A/NBP/2021".to_string()
             })
         );
