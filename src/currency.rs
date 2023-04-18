@@ -1,22 +1,23 @@
+use derive_more::Display;
 use derive_more::{Add, Sub};
 use macros;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-
 use std::fmt;
 use std::fmt::Debug;
-
 use std::ops::{Div, Mul};
+
+#[derive(Debug, Deserialize, Serialize, Display)]
+pub enum Code {
+    PLN,
+    USD,
+    GBP,
+    EUR,
+}
 
 pub trait Currency: Debug {
     fn get_value(&self) -> &Decimal;
     fn get_name(&self) -> &str;
-}
-
-impl fmt::Display for dyn Currency {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.get_value(), self.get_name())
-    }
 }
 
 #[derive(
@@ -82,6 +83,21 @@ pub struct Eur(pub Decimal);
     macros::Div,
 )]
 pub struct Gbp(pub Decimal);
+
+impl fmt::Display for dyn Currency {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.get_value(), self.get_name())
+    }
+}
+
+pub fn new(name: &Code, value: Decimal) -> Box<dyn Currency> {
+    match name {
+        Code::PLN => Box::new(Pln(value)),
+        Code::USD => Box::new(Usd(value)),
+        Code::GBP => Box::new(Gbp(value)),
+        Code::EUR => Box::new(Eur(value)),
+    }
+}
 
 #[cfg(test)]
 mod tests {

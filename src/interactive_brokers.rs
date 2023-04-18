@@ -2,21 +2,12 @@ use crate::activity;
 use crate::currency;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
-use derive_more::Display;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-
-#[derive(Debug, Deserialize, Serialize, Display)]
-pub enum Currency {
-    PLN,
-    USD,
-    GBP,
-    EUR,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Transaction {
@@ -27,7 +18,7 @@ struct Transaction {
     #[serde(rename(deserialize = "T. Price"))]
     price: Decimal,
     #[serde(rename(deserialize = "Currency"))]
-    currency: Currency,
+    currency: currency::Code,
     #[serde(
         rename(deserialize = "Date/Time"),
         deserialize_with = "from_timestamp",
@@ -45,7 +36,7 @@ struct Dividend {
     #[serde(rename(deserialize = "Amount"))]
     value: Decimal,
     #[serde(rename(deserialize = "Currency"))]
-    currency: Currency,
+    currency: currency::Code,
     #[serde(rename(deserialize = "Date"), deserialize_with = "from_date")]
     timestamp: NaiveDate,
 }
@@ -106,15 +97,6 @@ where
     Ok(reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?)
 }
 
-fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Currency> {
-    match currency {
-        Currency::PLN => Box::new(currency::Pln(value)),
-        Currency::USD => Box::new(currency::Usd(value)),
-        Currency::GBP => Box::new(currency::Gbp(value)),
-        Currency::EUR => Box::new(currency::Eur(value)),
-    }
-}
-
 impl TryInto<activity::Activity> for Transaction {
     type Error = Box<dyn Error>;
 
@@ -126,22 +108,22 @@ impl TryInto<activity::Activity> for Transaction {
                 true => activity::Operation::Buy {
                     quantity: self.quantity,
                     price: activity::Money::new(
-                        into_currency(&self.currency, self.price.round_dp(2)),
+                        currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
                     commision: activity::Money::new(
-                        into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
                 false => activity::Operation::Sell {
                     quantity: self.quantity.abs(),
                     price: activity::Money::new(
-                        into_currency(&self.currency, self.price.round_dp(2)),
+                        currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
                     commision: activity::Money::new(
-                        into_currency(&self.currency, self.commision.abs().round_dp(2)),
+                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
@@ -160,7 +142,7 @@ impl TryInto<activity::Activity> for Dividend {
             symbol: self.symbol,
             timestamp: timestamp,
             operation: activity::Operation::Dividend {
-                value: activity::Money::new(into_currency(&self.currency, self.value), &timestamp)?,
+                value: activity::Money::new(currency::new(&self.currency, self.value), &timestamp)?,
             },
         })
     }

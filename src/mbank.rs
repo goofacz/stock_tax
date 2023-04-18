@@ -28,7 +28,7 @@ struct Transaction {
     #[serde(rename(deserialize = "Kurs"), deserialize_with = "from_float")]
     price: Decimal,
     #[serde(rename(deserialize = "Waluta"))]
-    currency: Currency,
+    currency: currency::Code,
     #[serde(
         rename(deserialize = "Czas transakcji"),
         deserialize_with = "from_timestamp",
@@ -38,7 +38,7 @@ struct Transaction {
     #[serde(rename(deserialize = "Prowizja"), deserialize_with = "from_float")]
     commision: Decimal,
     #[serde(rename(deserialize = "Waluta rozliczenia"))]
-    commision_currency: Currency,
+    commision_currency: currency::Code,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -96,15 +96,6 @@ where
     s.serialize_str(&date)
 }
 
-fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Currency> {
-    match currency {
-        Currency::PLN => Box::new(currency::Pln(value)),
-        Currency::USD => Box::new(currency::Usd(value)),
-        Currency::GBP => Box::new(currency::Gbp(value)),
-        Currency::EUR => Box::new(currency::Eur(value)),
-    }
-}
-
 impl TryInto<activity::Activity> for Transaction {
     type Error = Box<dyn Error>;
 
@@ -116,22 +107,22 @@ impl TryInto<activity::Activity> for Transaction {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
                     price: activity::Money::new(
-                        into_currency(&self.currency, self.price.round_dp(2)),
+                        currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
                     commision: activity::Money::new(
-                        into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                        currency::new(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
                     price: activity::Money::new(
-                        into_currency(&self.currency, self.price.round_dp(2)),
+                        currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
                     commision: activity::Money::new(
-                        into_currency(&self.commision_currency, self.commision.round_dp(2)),
+                        currency::new(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
