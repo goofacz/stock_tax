@@ -48,12 +48,15 @@ fn from_date<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
 where
     D: Deserializer<'de>,
 {
+    lazy_static! {
+        static ref TIME: NaiveTime = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    }
+
     let value: &str = Deserialize::deserialize(deserializer)?;
     let date = NaiveDate::parse_from_str(value, "%Y-%m-%d")
         .map_err(|_| de::Error::custom(format!("Failed to parse date: {}", value)))?;
-    let time = NaiveTime::from_hms_opt(0, 0, 0)
-        .ok_or(de::Error::custom(format!("Failed to create empty time")))?;
-    Ok(NaiveDateTime::new(date, time))
+
+    Ok(NaiveDateTime::new(date, TIME.clone()))
 }
 
 impl Into<Rate> for Entry {
