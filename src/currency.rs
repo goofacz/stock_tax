@@ -17,7 +17,7 @@ pub enum Code {
 
 pub trait Currency: Debug {
     fn get_value(&self) -> &Decimal;
-    fn get_name(&self) -> &str;
+    fn get_name(&self) -> &'static str;
 }
 
 #[derive(

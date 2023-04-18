@@ -12,7 +12,7 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
                 &self.0
             }
 
-            fn get_name(&self) -> &str {
+            fn get_name(&self) -> &'static str {
                 return #name;
             }
         }
