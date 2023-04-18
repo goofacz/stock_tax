@@ -4,6 +4,7 @@ use chrono::naive::serde::ts_milliseconds;
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::error::Error;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Money {
@@ -28,6 +29,14 @@ pub enum Operation {
     Dividend {
         value: Money,
     },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Activity {
+    pub symbol: String,
+    #[serde(with = "ts_milliseconds")]
+    pub timestamp: NaiveDateTime,
+    pub operation: Operation,
 }
 
 fn from_currency<'de, D>(deserializer: D) -> Result<Box<dyn Currency>, D::Error>
@@ -60,10 +69,16 @@ where
     s.serialize_str(&currency.to_string())
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Activity {
-    pub symbol: String,
-    #[serde(with = "ts_milliseconds")]
-    pub timestamp: NaiveDateTime,
-    pub operation: Operation,
+impl Money {
+    pub fn new(
+        value: Box<dyn Currency>,
+        timestamp: &NaiveDateTime,
+    ) -> Result<Money, Box<dyn Error>> {
+        let (pln, rate) = nbp::convert(&value, timestamp)?;
+        Ok(Money {
+            original: value,
+            pln: pln,
+            rate: rate,
+        })
+    }
 }

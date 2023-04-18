@@ -1,6 +1,5 @@
 use crate::activity;
 use crate::currency;
-use crate::nbp;
 use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use derive_more::Display;
@@ -106,18 +105,6 @@ fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Curre
     }
 }
 
-fn into_money(
-    value: Box<dyn currency::Currency>,
-    timestamp: &NaiveDateTime,
-) -> Result<activity::Money, Box<dyn Error>> {
-    let (pln, rate) = nbp::convert(&value, timestamp)?;
-    Ok(activity::Money {
-        original: value,
-        pln: pln,
-        rate: rate,
-    })
-}
-
 impl TryInto<activity::Activity> for Transaction {
     type Error = Box<dyn Error>;
 
@@ -128,22 +115,22 @@ impl TryInto<activity::Activity> for Transaction {
             operation: match self.operation {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
-                    price: into_money(
+                    price: activity::Money::new(
                         into_currency(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: into_money(
+                    commision: activity::Money::new(
                         into_currency(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
-                    price: into_money(
+                    price: activity::Money::new(
                         into_currency(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: into_money(
+                    commision: activity::Money::new(
                         into_currency(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,

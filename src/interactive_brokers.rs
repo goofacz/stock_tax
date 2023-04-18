@@ -1,6 +1,5 @@
 use crate::activity;
 use crate::currency;
-use crate::nbp;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
 use derive_more::Display;
@@ -116,18 +115,6 @@ fn into_currency(currency: &Currency, value: Decimal) -> Box<dyn currency::Curre
     }
 }
 
-fn into_money(
-    value: Box<dyn currency::Currency>,
-    timestamp: &NaiveDateTime,
-) -> Result<activity::Money, Box<dyn Error>> {
-    let (pln, rate) = nbp::convert(&value, timestamp)?;
-    Ok(activity::Money {
-        original: value,
-        pln: pln,
-        rate: rate,
-    })
-}
-
 impl TryInto<activity::Activity> for Transaction {
     type Error = Box<dyn Error>;
 
@@ -138,22 +125,22 @@ impl TryInto<activity::Activity> for Transaction {
             operation: match self.quantity.is_sign_positive() {
                 true => activity::Operation::Buy {
                     quantity: self.quantity,
-                    price: into_money(
+                    price: activity::Money::new(
                         into_currency(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: into_money(
+                    commision: activity::Money::new(
                         into_currency(&self.currency, self.commision.abs().round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
                 false => activity::Operation::Sell {
                     quantity: self.quantity.abs(),
-                    price: into_money(
+                    price: activity::Money::new(
                         into_currency(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: into_money(
+                    commision: activity::Money::new(
                         into_currency(&self.currency, self.commision.abs().round_dp(2)),
                         &self.timestamp,
                     )?,
@@ -173,7 +160,7 @@ impl TryInto<activity::Activity> for Dividend {
             symbol: self.symbol,
             timestamp: timestamp,
             operation: activity::Operation::Dividend {
-                value: into_money(into_currency(&self.currency, self.value), &timestamp)?,
+                value: activity::Money::new(into_currency(&self.currency, self.value), &timestamp)?,
             },
         })
     }
