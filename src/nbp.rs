@@ -69,6 +69,32 @@ impl Into<Rate> for Entry {
     }
 }
 
+fn get_rate(
+    currency_code: &Code,
+    date: &NaiveDateTime,
+) -> Result<Option<Rate>, Box<dyn error::Error>> {
+    lazy_static! {
+        static ref CLIENT: Client = Client::new();
+    }
+
+    let request = format!(
+        "http://api.nbp.pl/api/exchangerates/rates/a/{currency_name}/{date}/?format=json",
+        currency_name = currency_code.to_string().to_lowercase(),
+        date = date.format("%Y-%m-%d").to_string()
+    );
+
+    let reply = CLIENT.get(request).send()?;
+    match reply.status() {
+        StatusCode::NOT_FOUND => Ok(None),
+        StatusCode::OK => {
+            let mut entries: Entries = reply.json()?;
+            let entry = entries.values.pop().ok_or(Error::new("No entries"))?;
+            Ok(Some(entry.into()))
+        }
+        _ => Err(Box::new(Error::new("GET request failed"))),
+    }
+}
+
 pub fn convert(
     amount: &Box<dyn Currency>,
     trade_date: &NaiveDateTime,
@@ -78,39 +104,28 @@ pub fn convert(
     }
 
     let currency_code = amount.get_code();
-    if amount.get_code() == Code::PLN {
-        return Ok((Pln(*amount.get_value()), None));
-    }
-
-    for days in 1..=10 {
-        let date = trade_date
-            .checked_sub_days(Days::new(days))
-            .ok_or(Error::new("Failed to decrement date"))?;
-
-        let request = format!(
-            "http://api.nbp.pl/api/exchangerates/rates/a/{currency_name}/{date}/?format=json",
-            currency_name = currency_code.to_string().to_lowercase(),
-            date = date.format("%Y-%m-%d").to_string()
-        );
-
-        let reply = CLIENT.get(request).send()?;
-        match reply.status() {
-            StatusCode::NOT_FOUND => {
-                continue;
+    match amount.get_code() {
+        Code::PLN => Ok((Pln(*amount.get_value()), None)),
+        _ => {
+            for days in 1..=10 {
+                let date = trade_date
+                    .checked_sub_days(Days::new(days))
+                    .ok_or(Error::new("Failed to decrement date"))?;
+                let rate = get_rate(&currency_code, &date)?;
+                match rate {
+                    Some(rate) => {
+                        let value = (amount.get_value() * rate.value).round_dp(2);
+                        return Ok((Pln(value), Some(rate)));
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
             }
-            StatusCode::OK => {
-                let mut entries: Entries = reply.json()?;
-                let entry = entries.values.pop().ok_or(Error::new("No entries"))?;
-                let value = (amount.get_value() * entry.value).round_dp(2);
-                return Ok((Pln(value), Some(entry.into())));
-            }
-            _ => {
-                return Err(Box::new(Error::new("GET request failed")));
-            }
+
+            Err(Box::new(Error::new("Failed to find rate for trade date")))
         }
     }
-
-    Err(Box::new(Error::new("Failed to find rate for trade date")))
 }
 
 #[cfg(test)]
