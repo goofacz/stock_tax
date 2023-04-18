@@ -7,7 +7,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::ops::{Div, Mul};
 
-#[derive(Debug, Deserialize, Serialize, Display)]
+#[derive(Debug, Deserialize, Serialize, Display, PartialEq)]
 pub enum Code {
     PLN,
     USD,
@@ -17,7 +17,7 @@ pub enum Code {
 
 pub trait Currency: Debug {
     fn get_value(&self) -> &Decimal;
-    fn get_name(&self) -> &'static str;
+    fn get_code(&self) -> Code;
 }
 
 #[derive(
@@ -86,7 +86,7 @@ pub struct Gbp(pub Decimal);
 
 impl fmt::Display for dyn Currency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.get_value(), self.get_name())
+        write!(f, "{} {}", self.get_value(), self.get_code())
     }
 }
 
@@ -106,9 +106,13 @@ mod tests {
 
     #[test]
     fn test_currency() {
-        let a = Usd(dec!(3.45));
-        assert_eq!(a.get_value().clone(), dec!(3.45));
-        assert_eq!(a.get_name(), "USD");
+        let usd = Usd(dec!(3.45));
+        assert_eq!(usd.get_value().clone(), dec!(3.45));
+        assert_eq!(usd.get_code(), Code::USD);
+
+        let pln = Pln(dec!(1.23));
+        assert_eq!(pln.get_value().clone(), dec!(1.23));
+        assert_eq!(pln.get_code(), Code::PLN);
     }
 
     #[test]

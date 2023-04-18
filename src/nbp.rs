@@ -1,4 +1,4 @@
-use crate::currency::{Currency, Pln};
+use crate::currency::{Code, Currency, Pln};
 use chrono::naive::{Days, NaiveDateTime};
 use chrono::{NaiveDate, NaiveTime};
 use derive_more::{Display, Error};
@@ -74,8 +74,8 @@ pub fn convert(
         static ref CLIENT: Client = Client::new();
     }
 
-    let currency_name = amount.get_name();
-    if currency_name == Pln::default().get_name() {
+    let currency_code = amount.get_code();
+    if amount.get_code() == Code::PLN {
         return Ok((Pln(*amount.get_value()), None));
     }
 
@@ -86,7 +86,7 @@ pub fn convert(
 
         let request = format!(
             "http://api.nbp.pl/api/exchangerates/rates/a/{currency_name}/{date}/?format=json",
-            currency_name = currency_name,
+            currency_name = currency_code.to_string().to_lowercase(),
             date = date.format("%Y-%m-%d").to_string()
         );
 
