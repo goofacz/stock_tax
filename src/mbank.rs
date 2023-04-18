@@ -1,4 +1,4 @@
-use crate::activity;
+use crate::activity::{self, Activity, Money};
 use crate::currency;
 use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
@@ -96,32 +96,32 @@ where
     s.serialize_str(&date)
 }
 
-impl TryInto<activity::Activity> for Transaction {
+impl TryInto<Activity> for Transaction {
     type Error = Box<dyn Error>;
 
-    fn try_into(self) -> Result<activity::Activity, Self::Error> {
-        Ok(activity::Activity {
+    fn try_into(self) -> Result<Activity, Self::Error> {
+        Ok(Activity {
             symbol: self.symbol,
             timestamp: self.timestamp,
             operation: match self.operation {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
-                    price: activity::Money::new(
+                    price: Money::new(
                         currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: activity::Money::new(
+                    commision: Money::new(
                         currency::new(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
-                    price: activity::Money::new(
+                    price: Money::new(
                         currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: activity::Money::new(
+                    commision: Money::new(
                         currency::new(&self.commision_currency, self.commision.round_dp(2)),
                         &self.timestamp,
                     )?,
@@ -131,7 +131,7 @@ impl TryInto<activity::Activity> for Transaction {
     }
 }
 
-pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
+pub fn convert(path: &Path) -> Result<Vec<Activity>, Box<dyn Error>> {
     let mut reader = ReaderBuilder::new()
         .delimiter(b';')
         .has_headers(true)
@@ -147,5 +147,5 @@ pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
         .map(|entry| entry.try_into())
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
-        .collect::<Vec<activity::Activity>>())
+        .collect::<Vec<_>>())
 }

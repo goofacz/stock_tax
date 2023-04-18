@@ -43,7 +43,7 @@ fn from_currency<'de, D>(deserializer: D) -> Result<Box<dyn Currency>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let value: &str = Deserialize::deserialize(deserializer)?;
+    let value: String = Deserialize::deserialize(deserializer)?;
     let (amount, currency) = value
         .split_once(' ')
         .ok_or(de::Error::custom(format!("Failed to split \"{}\"", value)))?;

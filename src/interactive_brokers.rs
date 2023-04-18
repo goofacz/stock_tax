@@ -1,4 +1,4 @@
-use crate::activity;
+use crate::activity::{Activity, Money, Operation};
 use crate::currency;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use csv::ReaderBuilder;
@@ -84,9 +84,60 @@ where
     s.serialize_str(&date)
 }
 
-fn extract<'de, T>(lines: String) -> Result<Vec<T>, Box<dyn Error>>
+impl TryInto<Activity> for Transaction {
+    type Error = Box<dyn Error>;
+
+    fn try_into(self) -> Result<Activity, Self::Error> {
+        Ok(Activity {
+            symbol: self.symbol,
+            timestamp: self.timestamp,
+            operation: match self.quantity.is_sign_positive() {
+                true => Operation::Buy {
+                    quantity: self.quantity,
+                    price: Money::new(
+                        currency::new(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: Money::new(
+                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                },
+                false => Operation::Sell {
+                    quantity: self.quantity.abs(),
+                    price: Money::new(
+                        currency::new(&self.currency, self.price.round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                    commision: Money::new(
+                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
+                        &self.timestamp,
+                    )?,
+                },
+            },
+        })
+    }
+}
+
+impl TryInto<Activity> for Dividend {
+    type Error = Box<dyn Error>;
+
+    fn try_into(self) -> Result<Activity, Self::Error> {
+        let timestamp =
+            NaiveDateTime::new(self.timestamp, NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        Ok(Activity {
+            symbol: self.symbol,
+            timestamp: timestamp,
+            operation: Operation::Dividend {
+                value: Money::new(currency::new(&self.currency, self.value), &timestamp)?,
+            },
+        })
+    }
+}
+
+fn extract<T>(lines: String) -> Result<impl Iterator<Item = T>, Box<dyn Error>>
 where
-    T: de::DeserializeOwned,
+    T: de::DeserializeOwned + TryInto<Activity>,
 {
     let mut reader = ReaderBuilder::new()
         .delimiter(b',')
@@ -94,107 +145,53 @@ where
         .flexible(true)
         .from_reader(lines.as_bytes());
 
-    Ok(reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?)
+    let values: Vec<T> = reader.deserialize::<T>().collect::<Result<Vec<_>, _>>()?;
+    Ok(values.into_iter())
 }
 
-impl TryInto<activity::Activity> for Transaction {
-    type Error = Box<dyn Error>;
-
-    fn try_into(self) -> Result<activity::Activity, Self::Error> {
-        Ok(activity::Activity {
-            symbol: self.symbol,
-            timestamp: self.timestamp,
-            operation: match self.quantity.is_sign_positive() {
-                true => activity::Operation::Buy {
-                    quantity: self.quantity,
-                    price: activity::Money::new(
-                        currency::new(&self.currency, self.price.round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                    commision: activity::Money::new(
-                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                },
-                false => activity::Operation::Sell {
-                    quantity: self.quantity.abs(),
-                    price: activity::Money::new(
-                        currency::new(&self.currency, self.price.round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                    commision: activity::Money::new(
-                        currency::new(&self.currency, self.commision.abs().round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                },
-            },
-        })
-    }
+fn filter_lines<F>(lines: &[String], function: F) -> String
+where
+    F: FnMut(&&std::string::String) -> bool,
+{
+    lines
+        .iter()
+        .filter(function)
+        .collect::<Vec<_>>()
+        .iter()
+        .fold(String::new(), |buf, &line| buf + line + "\n")
 }
 
-impl TryInto<activity::Activity> for Dividend {
-    type Error = Box<dyn Error>;
-
-    fn try_into(self) -> Result<activity::Activity, Self::Error> {
-        let timestamp =
-            NaiveDateTime::new(self.timestamp, NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        Ok(activity::Activity {
-            symbol: self.symbol,
-            timestamp: timestamp,
-            operation: activity::Operation::Dividend {
-                value: activity::Money::new(currency::new(&self.currency, self.value), &timestamp)?,
-            },
-        })
-    }
-}
-
-pub fn convert(path: &Path) -> Result<Vec<activity::Activity>, Box<dyn Error>> {
+pub fn convert(path: &Path) -> Result<Vec<Activity>, Box<dyn Error>> {
     let handle = File::open(path)?;
     let reader = BufReader::new(handle);
     let lines: Vec<_> = reader.lines().collect::<Result<Vec<_>, _>>()?;
-    let mut activities = vec![];
 
-    let transactions = lines
-        .iter()
-        .filter(|line| {
-            let header = "Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,C. Price,Proceeds,Comm/Fee,Basis,Realized P/L,MTM P/L,Code";
-            let prefix = "Trades,Data,Order,Stocks";
-            line.starts_with(header) || line.starts_with(prefix)
-        })
-        .collect::<Vec<_>>()
-        .iter()
-        .fold(String::new(),|buf, &line|{ buf + line + "\n"});
+    let transactions = filter_lines(&lines, |line| {
+        let header = "Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,C. Price,Proceeds,Comm/Fee,Basis,Realized P/L,MTM P/L,Code";
+        let prefix = "Trades,Data,Order,Stocks";
+        line.starts_with(header) || line.starts_with(prefix)
+    });
 
-    activities.append(
-        &mut extract::<Transaction>(transactions)?
-            .into_iter()
-            .map(|entry| entry.try_into())
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .collect::<Vec<activity::Activity>>(),
-    );
+    let transactions = extract::<Transaction>(transactions)?
+        .map(|entry| entry.try_into())
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter();
 
-    let dividends = lines
-        .iter()
-        .filter(|line| {
-            let header = "Dividends,Header,Currency,Date,Description,Amount";
-            let prefix = "Dividends,Data,";
-            let summary_prefix = "Dividends,Data,Total";
-            (line.starts_with(header) || line.starts_with(prefix))
-                && !line.starts_with(summary_prefix)
-        })
-        .collect::<Vec<_>>()
-        .iter()
-        .fold(String::new(), |buf, &line| buf + line + "\n");
+    let dividends = filter_lines(&lines, |line| {
+        let header = "Dividends,Header,Currency,Date,Description,Amount";
+        let prefix = "Dividends,Data,";
+        let summary_prefix = "Dividends,Data,Total";
+        (line.starts_with(header) || line.starts_with(prefix)) && !line.starts_with(summary_prefix)
+    });
 
-    activities.append(
-        &mut extract::<Dividend>(dividends)?
-            .into_iter()
-            .map(|entry| entry.try_into())
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .collect::<Vec<activity::Activity>>(),
-    );
+    let dividends = extract::<Dividend>(dividends)?
+        .map(|entry| entry.try_into())
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter();
 
-    Ok(activities)
+    Ok(vec![]
+        .into_iter()
+        .chain(transactions)
+        .chain(dividends)
+        .collect::<Vec<_>>())
 }

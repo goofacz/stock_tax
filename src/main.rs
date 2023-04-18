@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 mod activity;
+mod compute;
 mod convert;
 mod currency;
 mod interactive_brokers;
@@ -16,6 +17,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Convert(convert::CommandArgs),
+    Compute(compute::CommandArgs),
 }
 
 fn main() {
@@ -23,6 +25,7 @@ fn main() {
 
     let result = match &cli.command {
         Command::Convert(args) => convert::command(&args),
+        Command::Compute(args) => compute::command(&args),
     };
 
     match result {
