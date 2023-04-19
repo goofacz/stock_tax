@@ -49,3 +49,16 @@ pub fn derive_div(input: TokenStream) -> TokenStream {
     };
     output.into()
 }
+
+#[proc_macro_derive(Display)]
+pub fn derive_display(input: TokenStream) -> TokenStream {
+    let DeriveInput { ident, .. } = parse_macro_input!(input);
+    let output = quote! {
+        impl fmt::Display for #ident {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{} {}", self.get_value(), self.get_code())
+            }
+        }
+    };
+    output.into()
+}

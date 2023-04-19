@@ -33,6 +33,7 @@ pub trait Currency: Debug {
     macros::Currency,
     macros::Mul,
     macros::Div,
+    macros::Display,
 )]
 pub struct Usd(pub Decimal);
 
@@ -49,6 +50,7 @@ pub struct Usd(pub Decimal);
     macros::Currency,
     macros::Mul,
     macros::Div,
+    macros::Display,
 )]
 pub struct Pln(pub Decimal);
 
@@ -65,6 +67,7 @@ pub struct Pln(pub Decimal);
     macros::Currency,
     macros::Mul,
     macros::Div,
+    macros::Display,
 )]
 pub struct Eur(pub Decimal);
 
@@ -81,6 +84,7 @@ pub struct Eur(pub Decimal);
     macros::Currency,
     macros::Mul,
     macros::Div,
+    macros::Display,
 )]
 pub struct Gbp(pub Decimal);
 
