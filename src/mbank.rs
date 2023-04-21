@@ -36,9 +36,9 @@ struct Transaction {
     )]
     timestamp: NaiveDateTime,
     #[serde(rename(deserialize = "Prowizja"), deserialize_with = "from_float")]
-    commision: Decimal,
+    commission: Decimal,
     #[serde(rename(deserialize = "Waluta rozliczenia"))]
-    commision_currency: currency::Code,
+    commission_currency: currency::Code,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -110,8 +110,8 @@ impl TryInto<Activity> for Transaction {
                         currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: Money::new(
-                        currency::new(&self.commision_currency, self.commision.round_dp(2)),
+                    commission: Money::new(
+                        currency::new(&self.commission_currency, self.commission.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },
@@ -121,8 +121,8 @@ impl TryInto<Activity> for Transaction {
                         currency::new(&self.currency, self.price.round_dp(2)),
                         &self.timestamp,
                     )?,
-                    commision: Money::new(
-                        currency::new(&self.commision_currency, self.commision.round_dp(2)),
+                    commission: Money::new(
+                        currency::new(&self.commission_currency, self.commission.round_dp(2)),
                         &self.timestamp,
                     )?,
                 },

@@ -19,12 +19,12 @@ pub enum Operation {
     Buy {
         quantity: Decimal,
         price: Money,
-        commision: Money,
+        commission: Money,
     },
     Sell {
         quantity: Decimal,
         price: Money,
-        commision: Money,
+        commission: Money,
     },
     Dividend {
         value: Money,
