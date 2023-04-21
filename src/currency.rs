@@ -1,5 +1,5 @@
 use derive_more::Display;
-use derive_more::{Add, Sub};
+use derive_more::{Add, AddAssign, Sub};
 use macros;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,7 @@ pub struct Usd(pub Decimal);
     Deserialize,
     Serialize,
     Add,
+    AddAssign,
     Sub,
     PartialEq,
     Copy,

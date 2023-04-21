@@ -1,4 +1,4 @@
-use crate::activity::{Activity, Operation};
+use crate::activity::{Activity, Money, Operation};
 use crate::currency::Pln;
 use chrono::{Datelike, NaiveDateTime};
 use clap::Args;
@@ -7,7 +7,8 @@ use glob::glob;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json;
-use std::collections::{HashMap, HashSet};
+use std::cmp::min;
+use std::collections::HashMap;
 use std::error;
 use std::fs::OpenOptions;
 use std::io::BufReader;
@@ -23,77 +24,94 @@ pub struct CommandArgs {
 }
 
 #[derive(Debug)]
-struct Dividend {
-    timestamp: NaiveDateTime,
-    value: Pln,
-}
-
-#[derive(Debug)]
 struct Share {
-    timestamp: NaiveDateTime,
     quantity: Decimal,
-    value: Pln,
-    commision: Pln,
+    price: Pln,
+    commission: Pln,
 }
 
 #[derive(Debug, Default)]
 struct Stock {
-    shares: Vec<Share>,
-    dividends: Vec<Dividend>,
+    shares: HashMap<String, Vec<Share>>,
 }
 
-#[derive(Debug, Default)]
-struct Account {
-    stocks: HashMap<String, Stock>,
-}
-
-impl Account {
-    fn get_stock(&mut self, symbol: &str) -> &mut Stock {
-        self.stocks.entry(symbol.to_string()).or_default()
+impl Share {
+    fn new(quantity: &Decimal, price: &Money, commission: &Money) -> Share {
+        Share {
+            quantity: *quantity,
+            price: price.pln,
+            commission: Pln((commission.pln.0 / quantity).round_dp(2)),
+        }
     }
+}
 
-    fn dividend(&mut self, symbol: &str, timestamp: &NaiveDateTime, value: Pln) {
-        let stock = self.get_stock(symbol);
-        stock.dividends.push(Dividend {
-            timestamp: *timestamp,
-            value: value,
-        });
+impl Stock {
+    fn get_shares(&mut self, symbol: String) -> &mut Vec<Share> {
+        self.shares.entry(symbol).or_default()
     }
 
     fn buy(
         &mut self,
-        symbol: &str,
         timestamp: &NaiveDateTime,
-        quantity: Decimal,
-        value: Pln,
-        commision: Pln,
+        symbol: &str,
+        quantity: &Decimal,
+        price: &Money,
+        commission: &Money,
     ) {
-        let stock = self.get_stock(symbol);
-        stock.shares.push(Share {
-            timestamp: *timestamp,
-            quantity: quantity,
-            value: value,
-            commision: commision,
-        });
+        println!("{date}: {symbol}: Buy quantity: {quantity} price: {price_org} / {price_pln} commission: {commission_org} / {commission_pln}",
+            date=timestamp.date(),
+            symbol=symbol,
+            quantity=quantity,
+            price_org=price.original,
+            price_pln=price.pln,
+            commission_org=commission.original,
+            commission_pln=commission.pln);
+
+        let shares = self.get_shares(symbol.to_string());
+        let share = Share::new(quantity, price, commission);
+        shares.push(share);
     }
 
-    fn calculate_taxes(mut self) {
-        let mut years: Vec<_> = self
-            .stocks
-            .values()
-            .map(|stock| {
-                let mut dividends_years = stock
-                    .dividends
-                    .iter()
-                    .map(|dividend| dividend.timestamp.year())
-                    .collect::<Vec<_>>();
-                dividends_years.dedup();
-                dividends_years
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        years.dedup();
-        println!(">>>>>\n{:#?}", years);
+    fn sell(
+        &mut self,
+        timestamp: &NaiveDateTime,
+        symbol: &str,
+        quantity: &Decimal,
+        price: &Money,
+        commission: &Money,
+    ) -> Pln {
+        let shares = self.get_shares(symbol.to_string());
+        let mut remaining_quantity = quantity.clone();
+        let sell_cost = (price.pln * *quantity) + commission.pln;
+        let mut buy_cost = Pln::default();
+        while remaining_quantity > dec!(0) {
+            let share = shares.first_mut().unwrap();
+            let quantity = min(share.quantity, remaining_quantity);
+
+            share.quantity -= quantity;
+            remaining_quantity -= quantity;
+
+            buy_cost += share.price * quantity;
+            buy_cost += share.commission * quantity;
+
+            if share.quantity == dec!(0) {
+                shares.pop();
+            }
+        }
+
+        let tax = buy_cost - sell_cost;
+
+        println!("{date}: {symbol}: Sell quantity: {quantity} price: {price_org} / {price_pln} commission: {commission_org} / {commission_pln} tax: {tax}",
+            date=timestamp.date(),
+            symbol=symbol,
+            quantity=quantity,
+            price_org=price.original,
+            price_pln=price.pln,
+            commission_org=commission.original,
+            commission_pln=commission.pln,
+            tax=tax);
+
+        tax
     }
 }
 
@@ -110,31 +128,59 @@ fn load_activities(path: &String) -> Result<Vec<Activity>, Box<dyn error::Error>
 }
 
 pub fn command(args: &CommandArgs) -> Result<(), Box<dyn error::Error>> {
-    let mut account = Account::default();
-    let activities = load_activities(&args.path)?;
+    let mut stock = Stock::default();
+    let all_activities = load_activities(&args.path)?;
 
-    for activity in activities {
-        match &activity.operation {
-            Operation::Dividend { value } => {
-                account.dividend(&activity.symbol, &activity.timestamp, value.pln);
+    for annual_activities in
+        all_activities.group_by(|a, b| a.timestamp.year() == b.timestamp.year())
+    {
+        let mut total_tax = Pln::default();
+        let mut total_loss = Pln::default();
+
+        let year = match annual_activities.first() {
+            Some(activity) => activity.timestamp.year(),
+            None => continue,
+        };
+        for activity in annual_activities.into_iter() {
+            let timestamp = &activity.timestamp;
+            let symbol = &activity.symbol;
+            match &activity.operation {
+                Operation::Dividend { value } => {
+                    let tax = Pln((value.pln.0 * dec!(0.04)).round_dp(0));
+                    total_tax += tax;
+                    println!(
+                        "{date}: {symbol}: Dividend value: {original} / {pln}: tax: {tax}",
+                        date = timestamp.date(),
+                        symbol = symbol,
+                        original = value.original,
+                        pln = value.pln,
+                        tax = tax
+                    );
+                }
+                Operation::Buy {
+                    quantity,
+                    price,
+                    commission,
+                } => {
+                    stock.buy(timestamp, symbol, quantity, price, commission);
+                }
+                Operation::Sell {
+                    quantity,
+                    price,
+                    commission,
+                } => {
+                    let value = stock.sell(timestamp, symbol, quantity, price, commission);
+                    if value.0.is_sign_positive() {
+                        total_tax += value;
+                    } else {
+                        total_loss += value;
+                    }
+                }
             }
-            Operation::Buy {
-                quantity,
-                price,
-                commision,
-            } => {
-                account.buy(
-                    &activity.symbol,
-                    &activity.timestamp,
-                    *quantity,
-                    price.pln,
-                    commision.pln,
-                );
-            }
-            _ => {}
         }
+
+        println!("{}: Total tax: {} loss: {}", year, total_tax, total_loss);
     }
-    println!("{:#?}", account);
-    account.calculate_taxes();
+
     Ok(())
 }
