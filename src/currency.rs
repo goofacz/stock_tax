@@ -1,13 +1,16 @@
+use crate::nbp;
+use chrono::NaiveDateTime;
 use derive_more::Display;
 use derive_more::{Add, AddAssign, Sub};
 use macros;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::{Div, Mul};
 
-#[derive(Debug, Deserialize, Serialize, Display, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Display, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Code {
     PLN,
     USD,
@@ -89,14 +92,19 @@ pub struct Eur(pub Decimal);
 )]
 pub struct Gbp(pub Decimal);
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Rates {
+    values: HashMap<(Code, NaiveDateTime), nbp::Rate>,
+}
+
 impl fmt::Display for dyn Currency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", self.get_value(), self.get_code())
     }
 }
 
-pub fn new(name: &Code, value: Decimal) -> Box<dyn Currency> {
-    match name {
+pub fn new(code: &Code, value: Decimal) -> Box<dyn Currency> {
+    match code {
         Code::PLN => Box::new(Pln(value)),
         Code::USD => Box::new(Usd(value)),
         Code::GBP => Box::new(Gbp(value)),

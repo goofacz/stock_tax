@@ -1,5 +1,6 @@
 use crate::activity::{self, Activity, Money};
 use crate::currency;
+use crate::currency::Pln;
 use chrono::NaiveDateTime;
 use csv::ReaderBuilder;
 use derive_more::Display;
@@ -96,38 +97,46 @@ where
     s.serialize_str(&date)
 }
 
-impl TryInto<Activity> for Transaction {
-    type Error = Box<dyn Error>;
-
-    fn try_into(self) -> Result<Activity, Self::Error> {
-        Ok(Activity {
+impl Into<Activity> for Transaction {
+    fn into(self) -> Activity {
+        Activity {
             symbol: self.symbol,
             timestamp: self.timestamp,
             operation: match self.operation {
                 Operation::Buy => activity::Operation::Buy {
                     quantity: self.quantity.into(),
-                    price: Money::new(
-                        currency::new(&self.currency, self.price.round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                    commission: Money::new(
-                        currency::new(&self.commission_currency, self.commission.round_dp(2)),
-                        &self.timestamp,
-                    )?,
+                    price: Money {
+                        original: currency::new(&self.currency, self.price.round_dp(2)),
+                        pln: Pln::default(),
+                        rate: None,
+                    },
+                    commission: Money {
+                        original: currency::new(
+                            &self.commission_currency,
+                            self.commission.round_dp(2),
+                        ),
+                        pln: Pln::default(),
+                        rate: None,
+                    },
                 },
                 Operation::Sell => activity::Operation::Sell {
                     quantity: self.quantity.into(),
-                    price: Money::new(
-                        currency::new(&self.currency, self.price.round_dp(2)),
-                        &self.timestamp,
-                    )?,
-                    commission: Money::new(
-                        currency::new(&self.commission_currency, self.commission.round_dp(2)),
-                        &self.timestamp,
-                    )?,
+                    price: Money {
+                        original: currency::new(&self.currency, self.price.round_dp(2)),
+                        pln: Pln::default(),
+                        rate: None,
+                    },
+                    commission: Money {
+                        original: currency::new(
+                            &self.commission_currency,
+                            self.commission.round_dp(2),
+                        ),
+                        pln: Pln::default(),
+                        rate: None,
+                    },
                 },
             },
-        })
+        }
     }
 }
 

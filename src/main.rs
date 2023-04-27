@@ -1,4 +1,3 @@
-#![feature(slice_group_by)]
 use clap::{Parser, Subcommand};
 
 mod activity;

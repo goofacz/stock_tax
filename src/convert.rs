@@ -1,9 +1,10 @@
-use crate::activity::Activity;
+use crate::activity::{Activity, Operation};
 use crate::interactive_brokers;
 use crate::mbank;
-
+use crate::nbp;
 use clap::{Args, ValueEnum};
 use derive_more::{Display, Error};
+
 use serde_json;
 use std::error;
 use std::fs::OpenOptions;
@@ -50,6 +51,34 @@ pub fn command(args: &CommandArgs) -> Result<(), Box<dyn error::Error>> {
     };
 
     activities.sort_by_key(|activity| activity.timestamp);
+
+    for activity in &mut activities {
+        let transaction_date = activity.timestamp.date();
+        match &mut activity.operation {
+            Operation::Dividend {
+                value,
+                withholding_tax,
+            } => {
+                (value.pln, value.rate) = nbp::convert(&value.original, &transaction_date)?;
+                (withholding_tax.pln, withholding_tax.rate) =
+                    nbp::convert(&withholding_tax.original, &transaction_date)?;
+            }
+            Operation::Buy {
+                price, commission, ..
+            } => {
+                (price.pln, price.rate) = nbp::convert(&price.original, &transaction_date)?;
+                (commission.pln, commission.rate) =
+                    nbp::convert(&commission.original, &transaction_date)?;
+            }
+            Operation::Sell {
+                price, commission, ..
+            } => {
+                (price.pln, price.rate) = nbp::convert(&price.original, &transaction_date)?;
+                (commission.pln, commission.rate) =
+                    nbp::convert(&commission.original, &transaction_date)?;
+            }
+        }
+    }
 
     let begin_date = format_date(activities.first())?;
     let end_date = format_date(activities.last())?;

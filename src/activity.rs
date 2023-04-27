@@ -1,17 +1,22 @@
-use crate::currency::{Currency, Eur, Gbp, Pln, Usd};
-use crate::nbp;
-use chrono::naive::serde::ts_milliseconds;
+use crate::currency::{Currency, Eur, Gbp, Pln, Rates, Usd};
+use crate::nbp::Rate;
+use chrono::naive::serde::ts_seconds;
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::error::Error;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RateDate {
+    #[serde(with = "ts_seconds")]
+    pub value: NaiveDateTime,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Money {
     #[serde(deserialize_with = "from_currency", serialize_with = "to_currency")]
     pub original: Box<dyn Currency>,
     pub pln: Pln,
-    pub rate: Option<nbp::Rate>,
+    pub rate: Option<Rate>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -28,15 +33,22 @@ pub enum Operation {
     },
     Dividend {
         value: Money,
+        withholding_tax: Money,
     },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Activity {
     pub symbol: String,
-    #[serde(with = "ts_milliseconds")]
+    #[serde(with = "ts_seconds")]
     pub timestamp: NaiveDateTime,
     pub operation: Operation,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Document {
+    pub activities: Vec<Activity>,
+    pub rates: Rates,
 }
 
 fn from_currency<'de, D>(deserializer: D) -> Result<Box<dyn Currency>, D::Error>
@@ -67,18 +79,4 @@ where
     S: Serializer,
 {
     s.serialize_str(&currency.to_string())
-}
-
-impl Money {
-    pub fn new(
-        value: Box<dyn Currency>,
-        timestamp: &NaiveDateTime,
-    ) -> Result<Money, Box<dyn Error>> {
-        let (pln, rate) = nbp::convert(&value, timestamp)?;
-        Ok(Money {
-            original: value,
-            pln: pln,
-            rate: rate,
-        })
-    }
 }
