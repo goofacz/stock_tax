@@ -67,7 +67,7 @@ impl Block {
             timestamp: *timestamp,
             quantity: *quantity,
             price: price.pln,
-            commission: Pln((commission.pln.0 / quantity).round_dp(2)),
+            commission: commission.pln,
         }
     }
 }
