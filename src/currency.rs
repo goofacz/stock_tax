@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::{Div, Mul};
+use crate::tax::Tax;
 
 #[derive(Debug, Deserialize, Serialize, Display, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Code {
@@ -38,7 +39,7 @@ pub trait Currency: Debug {
     macros::Div,
     macros::Display,
 )]
-pub struct Usd(pub Decimal);
+pub struct Usd(Decimal);
 
 #[derive(
     Debug,
@@ -56,7 +57,7 @@ pub struct Usd(pub Decimal);
     macros::Div,
     macros::Display,
 )]
-pub struct Pln(pub Decimal);
+pub struct Pln(Decimal);
 
 #[derive(
     Debug,
@@ -73,7 +74,7 @@ pub struct Pln(pub Decimal);
     macros::Div,
     macros::Display,
 )]
-pub struct Eur(pub Decimal);
+pub struct Eur(Decimal);
 
 #[derive(
     Debug,
@@ -90,7 +91,7 @@ pub struct Eur(pub Decimal);
     macros::Div,
     macros::Display,
 )]
-pub struct Gbp(pub Decimal);
+pub struct Gbp(Decimal);
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Rates {

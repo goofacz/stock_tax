@@ -24,10 +24,10 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
 pub fn derive_mul(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, .. } = parse_macro_input!(input);
     let output = quote! {
-        impl Mul<Decimal> for #ident {
+        impl Mul<Tax> for #ident {
             type Output = #ident;
-            fn mul(self, rhs: Decimal) -> Self {
-                let result = self.0.checked_mul(rhs).unwrap().round_dp(2);
+            fn mul(self, rhs: Tax) -> Self {
+                let result = self.0.checked_mul(rhs.get_value()).unwrap().round_dp(2);
                 #ident(result)
             }
         }

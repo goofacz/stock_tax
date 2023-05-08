@@ -7,6 +7,7 @@ mod currency;
 mod interactive_brokers;
 mod mbank;
 mod nbp;
+mod tax;
 
 #[derive(Parser)]
 struct Cli {
