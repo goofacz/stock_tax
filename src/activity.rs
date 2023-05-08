@@ -63,10 +63,10 @@ where
         .map_err(|_| de::Error::custom(format!("Failed to parse \"{}\"", amount)))?;
 
     match currency {
-        "PLN" => Ok(Box::new(Pln(amount))),
-        "USD" => Ok(Box::new(Usd(amount))),
-        "GBP" => Ok(Box::new(Gbp(amount))),
-        "EUR" => Ok(Box::new(Eur(amount))),
+        "PLN" => Ok(Pln::new_box(amount)),
+        "USD" => Ok(Usd::new_box(amount)),
+        "GBP" => Ok(Gbp::new_box(amount)),
+        "EUR" => Ok(Eur::new_box(amount)),
         _ => Err(de::Error::custom(format!(
             "Unknown currency \"{}\"",
             currency

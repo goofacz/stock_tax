@@ -56,7 +56,7 @@ pub fn convert(
 
     match code {
         Code::PLN => {
-            return Ok((Pln(*amount.get_value()), None));
+            return Ok((Pln::new(*amount.get_value()), None));
         }
         _ => {
             for date in generate_previous_days(transaction_date) {
@@ -77,7 +77,7 @@ pub fn convert(
                         let entry = entries.values.pop().ok_or(Error::new("No entries"))?;
                         let rate: Rate = entry.into();
                         let value = (amount.get_value() * rate.value).round_dp(2);
-                        return Ok((Pln(value), Some(rate)));
+                        return Ok((Pln::new(value), Some(rate)));
                     }
                     StatusCode::NOT_FOUND => {
                         continue;
@@ -129,12 +129,12 @@ mod tests {
     #[test]
     fn test_usd_day_off() {
         let trade_date = NaiveDate::from_ymd_opt(2020, 1, 2).unwrap();
-        let amount: Box<dyn Currency> = Box::new(Usd(dec!(20)));
+        let amount: Box<dyn Currency> = Box::new(Usd::new(20));
 
         assert_eq!(
             convert(&amount, &trade_date),
             Ok((
-                Pln(dec!(75.95)),
+                Pln::new(dec!(75.95)),
                 Some(Rate {
                     value: dec!(3.7977),
                     date: NaiveDate::from_ymd_opt(2019, 12, 31).unwrap(),
@@ -147,12 +147,12 @@ mod tests {
     #[test]
     fn test_eur_business_day() {
         let trade_date = NaiveDate::from_ymd_opt(2021, 1, 6).unwrap();
-        let amount: Box<dyn Currency> = Box::new(Eur(dec!(20)));
+        let amount: Box<dyn Currency> = Box::new(Eur::new(20));
 
         assert_eq!(
             convert(&amount, &trade_date),
             Ok((
-                Pln(dec!(90.89)),
+                Pln::new(dec!(90.89)),
                 Some(Rate {
                     value: dec!(4.5446),
                     date: NaiveDate::from_ymd_opt(2021, 1, 5).unwrap(),
@@ -165,8 +165,8 @@ mod tests {
     #[test]
     fn test_pln() {
         let trade_date = NaiveDate::from_ymd_opt(2020, 1, 2).unwrap();
-        let amount: Box<dyn Currency> = Box::new(Pln(dec!(23)));
+        let amount: Box<dyn Currency> = Box::new(Pln::new(23));
 
-        assert_eq!(convert(&amount, &trade_date), Ok((Pln(dec!(23)), None)));
+        assert_eq!(convert(&amount, &trade_date), Ok((Pln::new(23), None)));
     }
 }

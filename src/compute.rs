@@ -1,5 +1,6 @@
 use crate::activity::{Activity, Money, Operation};
 use crate::currency::Pln;
+use crate::tax::Tax;
 use chrono::Datelike;
 use chrono::NaiveDateTime;
 use clap::Args;
@@ -102,7 +103,7 @@ impl Stock {
     ) -> (Pln, Pln) {
         let blocks = self.get_blocks(activity.symbol.to_string());
         let mut sell_quantity = *quantity;
-        let revenue = Pln((price.pln.0 * sell_quantity).round_dp(2));
+        let revenue = price.pln * sell_quantity;
         let sell_commission = commission.pln;
         let mut cost = Pln::default();
         let mut buy_commission = Pln::default();
@@ -115,7 +116,7 @@ impl Stock {
             block.quantity -= quantity;
             sell_quantity -= quantity;
 
-            let block_cost = Pln((block.price.0 * quantity).round_dp(2));
+            let block_cost = block.price * quantity;
             let block_buy_commission = if block.quantity == dec!(0) {
                 block.commission
             } else {
@@ -140,10 +141,10 @@ impl Stock {
 
         let cost = cost + buy_commission + sell_commission;
         let value = revenue - cost;
-        let (income, loss) = if value.0 > dec!(0) {
+        let (income, loss) = if value > Pln::new(0) {
             (value, Pln::default())
         } else {
-            (Pln::default(), Pln(value.0.abs()))
+            (Pln::default(), value.abs())
         };
 
         println!("{date}: {symbol}: {prefix} quantity: {quantity} cost: {cost} revenue: {revenue} income: {income} loss: {loss} price: {price_pln} ({price_org}) commission: {commission_pln} ({commission_org})",
@@ -231,14 +232,14 @@ fn process_annual_activities<'a>(
     }
 
     let tax_return = tax_positions.iter().map(|(symbol, tax_position)|{
-        let dividend_tax = Pln((tax_position.dividend.0 * dec!(0.19)).round_dp(2)) - tax_position.dividend_withholding_tax;
+        let dividend_tax = tax_position.dividend * Tax::new(19) - tax_position.dividend_withholding_tax;
         let value = tax_position.stock_revenue - tax_position.stock_cost;
-        let (stock_income, stock_loss) = if value.0 > dec!(0) {
+        let (stock_income, stock_loss) = if value > Pln::new(0) {
             (value, Pln::default())
         } else {
-            (Pln::default(), Pln(value.0.abs()))
+            (Pln::default(), value.abs())
         };
-        let stock_tax = Pln((stock_income.0 * dec!(0.19)).round_dp(2));
+        let stock_tax = stock_income * Tax::new(19);
 
         println!("{year}: {symbol} dividend tax: {dividend_tax} stock income: {stock_income} stock loss: {stock_loss} stock_tax: {stock_tax}");
 
@@ -254,7 +255,7 @@ fn process_annual_activities<'a>(
 
     let summary = format!("{year}: {prefix} dividend tax: {dividend_tax} stock revenue: {stock_revenue} stock cost: {stock_cost} stock income: {stock_income} stock loss: {stock_loss} stock tax: {stock_tax}",
         prefix="TAX RETURN".bright_blue(),
-        dividend_tax=Pln((tax_return.dividend_tax.0 * dec!(0.19)).round_dp(0)),
+        dividend_tax=tax_return.dividend_tax * Tax::new(19),
         stock_revenue=tax_return.stock_revenue,
         stock_cost=tax_return.stock_cost,
         stock_income=tax_return.stock_income,

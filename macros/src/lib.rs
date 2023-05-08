@@ -16,14 +16,7 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
                 Code::#code
             }
         }
-    };
-    output.into()
-}
-
-#[proc_macro_derive(Mul)]
-pub fn derive_mul(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, .. } = parse_macro_input!(input);
-    let output = quote! {
+        
         impl Mul<Tax> for #ident {
             type Output = #ident;
             fn mul(self, rhs: Tax) -> Self {
@@ -31,14 +24,15 @@ pub fn derive_mul(input: TokenStream) -> TokenStream {
                 #ident(result)
             }
         }
-    };
-    output.into()
-}
 
-#[proc_macro_derive(Div)]
-pub fn derive_div(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, .. } = parse_macro_input!(input);
-    let output = quote! {
+        impl Mul<Decimal> for #ident {
+            type Output = #ident;
+            fn mul(self, rhs: Decimal) -> Self {
+                let result = self.0.checked_mul(rhs).unwrap().round_dp(2);
+                #ident(result)
+            }
+        }
+        
         impl Div<Decimal> for #ident {
             type Output = #ident;
             fn div(self, rhs: Decimal) -> Self {
@@ -46,17 +40,28 @@ pub fn derive_div(input: TokenStream) -> TokenStream {
                 #ident(result)
             }
         }
-    };
-    output.into()
-}
-
-#[proc_macro_derive(Display)]
-pub fn derive_display(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, .. } = parse_macro_input!(input);
-    let output = quote! {
+        
         impl fmt::Display for #ident {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "{} {}", self.get_value(), self.get_code())
+            }
+        }
+        
+        impl #ident {
+            pub fn new<T>(amount: T) -> #ident where
+                T: Into<Decimal>
+            {
+                #ident(amount.into())
+            }
+
+            pub fn new_box<T>(amount: T) -> Box<#ident> where
+                T: Into<Decimal>
+            {
+                Box::new(#ident(amount.into()))
+            }
+            
+            pub fn abs(self) -> #ident {
+                #ident(self.0.abs())
             }
         }
     };

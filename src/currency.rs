@@ -1,7 +1,8 @@
 use crate::nbp;
+use crate::tax::Tax;
 use chrono::NaiveDateTime;
-use derive_more::Display;
 use derive_more::{Add, AddAssign, Sub};
+use derive_more::{Display, Error};
 use macros;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,19 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::{Div, Mul};
-use crate::tax::Tax;
+
+#[derive(Display, Error, Debug, PartialEq)]
+pub struct Error {
+    reason: String,
+}
+
+impl Error {
+    fn new(reason: &str) -> Error {
+        Error {
+            reason: reason.to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, Display, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Code {
@@ -31,13 +44,11 @@ pub trait Currency: Debug {
     Add,
     Sub,
     PartialEq,
+    PartialOrd,
     Copy,
     Clone,
     Default,
     macros::Currency,
-    macros::Mul,
-    macros::Div,
-    macros::Display,
 )]
 pub struct Usd(Decimal);
 
@@ -49,13 +60,11 @@ pub struct Usd(Decimal);
     AddAssign,
     Sub,
     PartialEq,
+    PartialOrd,
     Copy,
     Clone,
     Default,
     macros::Currency,
-    macros::Mul,
-    macros::Div,
-    macros::Display,
 )]
 pub struct Pln(Decimal);
 
@@ -66,13 +75,11 @@ pub struct Pln(Decimal);
     Add,
     Sub,
     PartialEq,
+    PartialOrd,
     Copy,
     Clone,
     Default,
     macros::Currency,
-    macros::Mul,
-    macros::Div,
-    macros::Display,
 )]
 pub struct Eur(Decimal);
 
@@ -83,13 +90,11 @@ pub struct Eur(Decimal);
     Add,
     Sub,
     PartialEq,
+    PartialOrd,
     Copy,
     Clone,
     Default,
     macros::Currency,
-    macros::Mul,
-    macros::Div,
-    macros::Display,
 )]
 pub struct Gbp(Decimal);
 
