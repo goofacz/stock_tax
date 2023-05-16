@@ -37,6 +37,11 @@ pub trait Currency: Debug {
     fn get_code(&self) -> Code;
 }
 
+pub trait Builder<T> {
+    fn new(amount: T) -> Self;
+    fn new_box(amount: T) -> Box<Self>;
+}
+
 #[derive(
     Debug,
     Deserialize,

@@ -1,4 +1,4 @@
-use crate::currency::{Code, Currency, Pln};
+use crate::currency::{Builder, Code, Currency, Pln};
 use chrono::naive::Days;
 use chrono::NaiveDate;
 use derive_more::{Display, Error};

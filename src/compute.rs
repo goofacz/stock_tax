@@ -1,5 +1,5 @@
 use crate::activity::{Activity, Money, Operation};
-use crate::currency::Pln;
+use crate::currency::{Builder, Pln};
 use crate::tax::Tax;
 use chrono::Datelike;
 use chrono::NaiveDateTime;

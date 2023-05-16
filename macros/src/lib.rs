@@ -16,7 +16,7 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
                 Code::#code
             }
         }
-        
+
         impl Mul<Tax> for #ident {
             type Output = #ident;
             fn mul(self, rhs: Tax) -> Self {
@@ -32,7 +32,7 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
                 #ident(result)
             }
         }
-        
+
         impl Div<Decimal> for #ident {
             type Output = #ident;
             fn div(self, rhs: Decimal) -> Self {
@@ -40,26 +40,36 @@ pub fn derive_currency(input: TokenStream) -> TokenStream {
                 #ident(result)
             }
         }
-        
+
         impl fmt::Display for #ident {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "{} {}", self.get_value(), self.get_code())
             }
         }
-        
-        impl #ident {
-            pub fn new<T>(amount: T) -> #ident where
-                T: Into<Decimal>
-            {
+
+        impl<T> Builder<T> for #ident  where
+            T: Into<Decimal>
+        {
+            fn new(amount: T) -> #ident {
                 #ident(amount.into())
             }
 
-            pub fn new_box<T>(amount: T) -> Box<#ident> where
-                T: Into<Decimal>
-            {
+            fn new_box(amount: T) -> Box<#ident> {
                 Box::new(#ident(amount.into()))
             }
-            
+        }
+
+        impl<f32> Builder<f32> for #ident {
+            fn new(amount: f32) -> #ident {
+                #ident(amount.into())
+            }
+
+            fn new_box(amount: f32) -> Box<#ident> {
+                Box::new(#ident(amount.into()))
+            }
+        }
+
+        impl #ident {
             pub fn abs(self) -> #ident {
                 #ident(self.0.abs())
             }

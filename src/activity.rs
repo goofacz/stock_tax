@@ -1,4 +1,4 @@
-use crate::currency::{Currency, Eur, Gbp, Pln, Rates, Usd};
+use crate::currency::{Builder, Currency, Eur, Gbp, Pln, Rates, Usd};
 use crate::nbp::Rate;
 use chrono::naive::serde::ts_seconds;
 use chrono::NaiveDateTime;
